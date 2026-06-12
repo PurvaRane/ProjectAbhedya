@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-white text-gray-800 antialiased;
+  }
+}
+
+@layer components {
+  .canara-top-bar {
+    @apply bg-canara-gold text-canara-blue-dark text-xs font-medium;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded bg-canara-blue px-6 py-3 text-sm font-semibold text-white transition hover:bg-canara-blue-dark focus:outline-none focus:ring-2 focus:ring-canara-gold focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .btn-gold {
+    @apply inline-flex items-center justify-center rounded bg-canara-gold px-6 py-3 text-sm font-bold text-canara-blue-dark transition hover:bg-canara-gold-dark focus:outline-none focus:ring-2 focus:ring-canara-blue focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded border-2 border-canara-blue bg-white px-6 py-3 text-sm font-semibold text-canara-blue transition hover:bg-canara-cream focus:outline-none focus:ring-2 focus:ring-canara-gold focus:ring-offset-2;
+  }
+
+  .btn-outline-white {
+    @apply inline-flex items-center justify-center rounded border-2 border-white bg-transparent px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10;
+  }
+
+  .input-field {
+    @apply w-full rounded border border-gray-300 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-gray-400 focus:border-canara-blue focus:ring-1 focus:ring-canara-blue;
+  }
+
+  .form-label {
+    @apply mb-1.5 block text-sm font-semibold text-gray-700;
+  }
+
+  .form-error {
+    @apply mt-1 text-sm text-red-600;
+  }
+
+  .auth-card {
+    @apply rounded border border-gray-200 bg-white p-8 shadow-card;
+  }
+
+  .section-title {
+    @apply text-2xl font-bold text-canara-blue;
+  }
+}
