@@ -8,6 +8,7 @@ import LandingPage from "./pages/LandingPage";
 
 import CustomerRegisterPage from "./pages/CustomerRegisterPage";
 import CustomerLoginPage from "./pages/CustomerLoginPage";
+import CustomerOnboardingPage from "./pages/CustomerOnboardingPage";
 
 import EmployeeLoginPage from "./pages/EmployeeLoginPage";
 
@@ -29,9 +30,15 @@ export default function App() {
             element={<LandingPage />}
           />
 
-          {/* Aadhaar Registration */}
+          {/* Aadhaar Registration — new unified 5-step onboarding */}
           <Route
             path="/aadhaar/register"
+            element={<CustomerOnboardingPage />}
+          />
+
+          {/* Legacy Aadhaar register (kept for backwards compatibility) */}
+          <Route
+            path="/aadhaar/register/legacy"
             element={<AadhaarRegisterPage />}
           />
 
