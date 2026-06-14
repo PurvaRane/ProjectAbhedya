@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 7
 
     otp_expire_minutes: int = 5
-    otp_rate_limit_seconds: int = 60
+    otp_rate_limit_seconds: int = 5
 
     smtp_host: str = "smtp.gmail.com"
     smtp_port: int = 587
@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     fast2sms_api_key: str = ""
     fast2sms_otp_id: str = ""
 
-    cors_origins: str = "http://localhost:5173,http://localhost:3000"
+    cors_origins: str = "http://localhost:5173,http://localhost:5174,http://localhost:3000"
 
     @field_validator("smtp_user", "smtp_password", "smtp_from", mode="before")
     @classmethod

@@ -5,6 +5,16 @@ from pydantic import BaseModel, EmailStr, Field, field_validator, model_validato
 
 from app.core.security import validate_pan_format, validate_password_strength
 
+def validate_aadhaar(aadhaar: str) -> str:
+    aadhaar = aadhaar.strip()
+
+    if not aadhaar.isdigit():
+        raise ValueError("Aadhaar must contain only digits")
+
+    if len(aadhaar) != 12:
+        raise ValueError("Aadhaar must be exactly 12 digits")
+
+    return aadhaar
 
 class PasswordMixin:
     password: str = Field(..., min_length=8)
@@ -79,12 +89,113 @@ class MobileVerifyOTPRequest(BaseModel):
             digits = digits[2:]
         return digits
 
+class AadhaarRegistrationRequest(BaseModel):
+    aadhaar_number: str
+    mobile_number: str
+
+    @field_validator("aadhaar_number")
+    @classmethod
+    def validate_aadhaar_number(cls, v: str) -> str:
+        return validate_aadhaar(v)
+
+    @field_validator("mobile_number")
+    @classmethod
+    def validate_mobile(cls, v: str) -> str:
+        digits = re.sub(r"\D", "", v.strip())
+
+        if len(digits) == 12 and digits.startswith("91"):
+            digits = digits[2:]
+
+        if len(digits) != 10:
+            raise ValueError("Invalid mobile number")
+
+        return digits
+
+
+class AadhaarOTPVerifyRequest(BaseModel):
+    aadhaar_number: str
+    mobile_number: str
+    otp_code: str = Field(..., min_length=6, max_length=6)
+
+    @field_validator("aadhaar_number")
+    @classmethod
+    def validate_aadhaar_number(cls, v: str) -> str:
+        return validate_aadhaar(v)
+
+    @field_validator("mobile_number")
+    @classmethod
+    def validate_mobile(cls, v: str) -> str:
+        digits = re.sub(r"\D", "", v.strip())
+
+        if len(digits) == 12 and digits.startswith("91"):
+            digits = digits[2:]
+
+        if len(digits) != 10:
+            raise ValueError(
+                "Mobile number must be a valid 10-digit Indian number"
+            )
+
+        return digits
+
+class AadhaarCompleteRegistrationRequest(PasswordMixin, BaseModel):
+    aadhaar_number: str
+    mobile_number: str
+    full_name: str = Field(..., min_length=2, max_length=255)
+    email: EmailStr
+    pan_number: str = Field(..., min_length=10, max_length=10)
+
+    @field_validator("aadhaar_number")
+    @classmethod
+    def validate_aadhaar_number(cls, v: str) -> str:
+        return validate_aadhaar(v)
+
+    @field_validator("mobile_number")
+    @classmethod
+    def validate_mobile(cls, v: str) -> str:
+        digits = re.sub(r"\D", "", v.strip())
+
+        if len(digits) == 12 and digits.startswith("91"):
+            digits = digits[2:]
+
+        if len(digits) != 10:
+            raise ValueError("Invalid mobile number")
+
+        return digits
+
+    @field_validator("pan_number")
+    @classmethod
+    def validate_pan(cls, v: str) -> str:
+        pan = v.strip().upper()
+
+        if not validate_pan_format(pan):
+            raise ValueError(
+                "Invalid PAN format. Expected format: ABCDE1234F"
+            )
+
+        return pan
+
+    @field_validator("full_name")
+    @classmethod
+    def sanitize_name(cls, v: str) -> str:
+        return v.strip()
+
+class AadhaarLoginRequest(BaseModel):
+    aadhaar_number: str
+
+    @field_validator("aadhaar_number")
+    @classmethod
+    def validate_aadhaar_number(cls, v: str) -> str:
+        return validate_aadhaar(v)
 
 class MobileVerifyOTPResponse(BaseModel):
     message: str
     mobile_number: str
     verified: bool
 
+class FaceVerificationResponse(BaseModel):
+    verified: bool
+    similarity: float
+    threshold: float
 
 class MobileCompleteRegistrationRequest(PasswordMixin, BaseModel):
     mobile_number: str

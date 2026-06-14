@@ -29,6 +29,77 @@ export const authApi = {
     confirm_password: string;
   }) => apiClient.post<UserResponse>("/auth/customer/register/mobile/complete", data),
 
+    sendAadhaarOTP: (data: {
+    aadhaar_number: string;
+    mobile_number: string;
+  }) =>
+    apiClient.post("/auth/customer/aadhaar/send-otp", data),
+
+  verifyAadhaarOTP: (data: {
+    aadhaar_number: string;
+    mobile_number: string;
+    otp_code: string;
+  }) =>
+    apiClient.post("/auth/customer/aadhaar/verify-otp", data),
+
+  completeAadhaarRegistration: (data: {
+    aadhaar_number: string;
+    mobile_number: string;
+    full_name: string;
+    email: string;
+    pan_number: string;
+    password: string;
+    confirm_password: string;
+  }) =>
+    apiClient.post<UserResponse>(
+      "/auth/customer/aadhaar/complete-registration",
+      data
+    ),
+
+  enrollFace: (
+    aadhaar_number: string,
+    file: File
+  ) => {
+    const formData = new FormData();
+
+    formData.append(
+      "file",
+      file
+    );
+
+    return apiClient.post(
+      `/auth/customer/aadhaar/enroll-face?aadhaar_number=${aadhaar_number}`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+  },
+
+  verifyFace: (
+    aadhaar_number: string,
+    file: File
+  ) => {
+    const formData = new FormData();
+
+    formData.append(
+      "file",
+      file
+    );
+
+    return apiClient.post(
+      `/auth/customer/aadhaar/verify-face?aadhaar_number=${aadhaar_number}`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+  },
+
   customerLogin: (data: { identifier: string; password: string }) =>
     apiClient.post<TokenResponse>("/auth/customer/login", data),
 

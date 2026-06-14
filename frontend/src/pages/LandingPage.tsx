@@ -84,13 +84,28 @@ export default function LandingPage() {
                     Track verification status online
                   </li>
                 </ul>
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <Link to="/customer/register" className="btn-gold flex-1 text-center">
-                    New Registration
+                <div className="flex flex-col gap-3">
+                  <Link
+                    to="/aadhaar/register"
+                    className="btn-primary text-center"
+                  >
+                    Aadhaar + Face Registration
                   </Link>
-                  <Link to="/customer/login" className="btn-secondary flex-1 text-center">
+
+                  <Link
+                    to="/customer/register"
+                    className="btn-gold text-center"
+                  >
+                    Mobile / Email Registration
+                  </Link>
+
+                  <Link
+                    to="/customer/login"
+                    className="btn-secondary text-center"
+                  >
                     Customer Login
                   </Link>
+
                 </div>
               </div>
             </article>

@@ -27,16 +27,71 @@ class User(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
+
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
-    mobile_number: Mapped[str | None] = mapped_column(String(15), unique=True, nullable=True, index=True)
-    pan_number: Mapped[str | None] = mapped_column(String(10), unique=True, nullable=True)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.CUSTOMER, nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+
+    email: Mapped[str] = mapped_column(
+        String(255),
+        unique=True,
+        nullable=False,
+        index=True,
     )
+
+    mobile_number: Mapped[str | None] = mapped_column(
+        String(15),
+        unique=True,
+        nullable=True,
+        index=True,
+    )
+
+    pan_number: Mapped[str | None] = mapped_column(
+        String(10),
+        unique=True,
+        nullable=True,
+    )
+
+    # NEW FIELDS
+    aadhaar_number: Mapped[str | None] = mapped_column(
+        String(12),
+        unique=True,
+        nullable=True,
+        index=True,
+    )
+
+    aadhaar_verified: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+
+    face_embedding: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    password_hash: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+
+    role: Mapped[UserRole] = mapped_column(
+        Enum(UserRole),
+        default=UserRole.CUSTOMER,
+        nullable=False,
+    )
+
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -68,7 +123,7 @@ class OTPVerification(Base):
     )
     mobile_number: Mapped[str | None] = mapped_column(String(15), nullable=True, index=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
-    otp_code: Mapped[str] = mapped_column(String(10), nullable=False)
+    otp_code: Mapped[str] = mapped_column(String(64), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(

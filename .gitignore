@@ -51,3 +51,8 @@ logs/
 # Database local dumps
 *.sql
 *.dump
+
+backend/uploads/
+__pycache__/
+*.pyc
+.env
