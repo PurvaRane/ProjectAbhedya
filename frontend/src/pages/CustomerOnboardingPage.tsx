@@ -190,40 +190,122 @@ export default function CustomerOnboardingPage() {
 
   /* ── Camera ─────────────────────────────────────────────────────────── */
   const startCamera = async () => {
-    setCameraError("");
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
-      });
-      streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
-      setCameraActive(true);
-    } catch {
-      setCameraError("Camera access denied or unavailable. Please switch to file upload.");
-    }
-  };
+  setCameraError("");
 
-  const capturePhoto = () => {
-    const video  = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas) return;
-    canvas.width  = video.videoWidth  || 640;
-    canvas.height = video.videoHeight || 480;
-    canvas.getContext("2d")?.drawImage(video, 0, 0);
-    canvas.toBlob(blob => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+        facingMode: "user",
+      },
+    });
+
+    streamRef.current = stream;
+
+    setCameraActive(true);
+
+    setTimeout(() => {
+      if (!videoRef.current) {
+        console.error("videoRef is null");
+        return;
+      }
+
+      videoRef.current.srcObject = stream;
+
+      videoRef.current.onloadedmetadata = async () => {
+        try {
+          await videoRef.current?.play();
+
+          console.log(
+            "Video ready:",
+            videoRef.current?.videoWidth,
+            videoRef.current?.videoHeight
+          );
+        } catch (err) {
+          console.error(err);
+        }
+      };
+    }, 300);
+  } catch (err) {
+    console.error(err);
+
+    setCameraError(
+      "Camera access denied or unavailable. Please switch to file upload."
+    );
+  }
+};
+const retakePhoto = async () => {
+  setFaceFile(null);
+  setFacePreview(null);
+  setError("");
+  clearAlerts();
+
+  if (faceMode === "camera") {
+    await startCamera();
+  }
+};
+
+  const capturePhoto = async () => {
+  const video = videoRef.current;
+  const canvas = canvasRef.current;
+
+  if (!video || !canvas) return;
+
+  if (video.readyState < 2) {
+    setError("Camera is still loading. Please wait a moment.");
+    return;
+  }
+
+  console.log(
+    "Video dimensions:",
+    video.videoWidth,
+    video.videoHeight
+  );
+
+  if (!video.videoWidth || !video.videoHeight) {
+    setError("Camera stream not initialized.");
+    return;
+  }
+
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  const ctx = canvas.getContext("2d");
+
+  if (!ctx) return;
+
+  ctx.drawImage(
+    video,
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
+
+  canvas.toBlob(
+    (blob) => {
       if (!blob) return;
-      const file = new File([blob], "face-capture.jpg", { type: "image/jpeg" });
-      setFaceFile(file);
-      setFacePreview(URL.createObjectURL(blob));
-      stopCamera();
-    }, "image/jpeg", 0.92);
-  };
 
-  const retakePhoto = () => {
-    setFaceFile(null);
-    setFacePreview(null);
-    if (faceMode === "camera") startCamera();
-  };
+      const file = new File(
+        [blob],
+        "face-capture.jpg",
+        {
+          type: "image/jpeg",
+        }
+      );
+
+      setFaceFile(file);
+      setFacePreview(
+        URL.createObjectURL(blob)
+      );
+
+      stopCamera();
+    },
+    "image/jpeg",
+    0.92
+  );
+};
 
   /* ── Step 1 ──────────────────────────────────────────────────────────── */
   const validateStep1 = () => {
@@ -730,13 +812,20 @@ export default function CustomerOnboardingPage() {
                       <div className="overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-50">
                         {cameraActive ? (
                           <video
-                            ref={videoRef}
-                            autoPlay
-                            playsInline
-                            muted
-                            className="w-full rounded-xl"
-                            style={{ maxHeight: "300px", objectFit: "cover" }}
-                          />
+                              ref={videoRef}
+                              autoPlay
+                              playsInline
+                              muted
+                              onLoadedMetadata={() => {
+                                console.log(
+                                  "VIDEO READY",
+                                  videoRef.current?.videoWidth,
+                                  videoRef.current?.videoHeight
+                                );
+                              }}
+                              className="w-full rounded-xl"
+                              style={{ maxHeight: "300px", objectFit: "cover" }}
+                            />
                         ) : (
                           <div className="flex flex-col items-center justify-center py-12 text-center">
                             <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full border-2 border-gray-300 text-gray-300">
