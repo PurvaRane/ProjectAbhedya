@@ -48,4 +48,148 @@
   .section-title {
     @apply text-2xl font-bold text-canara-blue;
   }
+
+  /* ── Dashboard Layout ───────────────────────────────────────── */
+
+  .dashboard-shell {
+    @apply flex min-h-screen flex-col bg-canara-gray;
+  }
+
+  .dashboard-topbar {
+    @apply sticky top-0 z-40 flex items-center justify-between border-b-4 border-canara-gold bg-canara-blue px-4 py-3 shadow-nav sm:px-6;
+  }
+
+  .dashboard-body {
+    @apply flex flex-1 overflow-hidden;
+  }
+
+  .dashboard-sidebar {
+    @apply flex h-[calc(100vh-64px)] flex-col bg-canara-blue-dark text-white transition-all duration-300 sticky top-16 overflow-y-auto;
+  }
+
+  .dashboard-sidebar.expanded {
+    @apply w-64;
+  }
+
+  .dashboard-sidebar.collapsed {
+    @apply w-16;
+  }
+
+  .dashboard-main {
+    @apply flex-1 overflow-y-auto bg-canara-gray p-6;
+  }
+
+  .sidebar-nav-item {
+    @apply flex items-center gap-3 rounded-lg mx-2 px-3 py-2.5 text-sm font-medium text-blue-200 transition-all duration-150 cursor-pointer hover:bg-white/10 hover:text-white;
+  }
+
+  .sidebar-nav-item.active {
+    @apply bg-canara-gold text-canara-blue-dark font-bold hover:bg-canara-gold-dark;
+  }
+
+  /* ── Status Badges ──────────────────────────────────────────── */
+
+  .badge-verified {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-700;
+  }
+
+  .badge-warning {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700;
+  }
+
+  .badge-danger {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-700;
+  }
+
+  .badge-info {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-700;
+  }
+
+  .badge-role {
+    @apply inline-flex items-center gap-2 rounded-full bg-canara-gold px-4 py-1.5 text-sm font-bold text-canara-blue-dark;
+  }
+
+  /* ── Dashboard Cards ────────────────────────────────────────── */
+
+  .dash-card {
+    @apply rounded-xl border border-gray-200 bg-white p-5 shadow-card transition hover:shadow-md;
+  }
+
+  .dash-card-header {
+    @apply mb-4 flex items-center justify-between border-b border-gray-100 pb-3;
+  }
+
+  .stat-card {
+    @apply rounded-xl border border-gray-100 bg-white p-5 shadow-card transition hover:-translate-y-0.5 hover:shadow-md;
+  }
+
+  .section-heading {
+    @apply mb-6 border-b-2 border-canara-gold pb-3 text-xl font-bold text-canara-blue;
+  }
+
+  /* ── Table ──────────────────────────────────────────────────── */
+
+  .dash-table {
+    @apply w-full text-left text-sm;
+  }
+
+  .dash-table thead tr {
+    @apply border-b-2 border-canara-gold;
+  }
+
+  .dash-table thead th {
+    @apply py-3 px-4 text-xs font-bold uppercase tracking-wider text-canara-blue;
+  }
+
+  .dash-table tbody tr {
+    @apply border-b border-gray-100 transition hover:bg-canara-cream;
+  }
+
+  .dash-table tbody td {
+    @apply py-3 px-4 text-gray-700;
+  }
+
+  /* ── Progress Bar ───────────────────────────────────────────── */
+
+  .progress-bar-track {
+    @apply h-2 w-full overflow-hidden rounded-full bg-gray-100;
+  }
+
+  .progress-bar-fill {
+    @apply h-full rounded-full bg-canara-blue transition-all duration-500;
+  }
+
+  /* ── Misc ───────────────────────────────────────────────────── */
+
+  .btn-sm-primary {
+    @apply inline-flex items-center gap-1.5 rounded bg-canara-blue px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-canara-blue-dark;
+  }
+
+  .btn-sm-secondary {
+    @apply inline-flex items-center gap-1.5 rounded border border-canara-blue bg-white px-3 py-1.5 text-xs font-semibold text-canara-blue transition hover:bg-canara-cream;
+  }
+
+  .btn-sm-danger {
+    @apply inline-flex items-center gap-1.5 rounded border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-100;
+  }
+
+  .input-sm {
+    @apply rounded border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition placeholder:text-gray-400 focus:border-canara-blue focus:ring-1 focus:ring-canara-blue;
+  }
+
+  .flow-step {
+    @apply flex flex-col items-center;
+  }
+
+  .flow-step-circle {
+    @apply flex h-10 w-10 items-center justify-center rounded-full bg-canara-blue font-bold text-white text-sm;
+  }
+
+  .flow-step-circle.done {
+    @apply bg-green-500;
+  }
+
+  .flow-arrow {
+    @apply mx-2 text-gray-300 text-xl;
+  }
 }
