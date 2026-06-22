@@ -6,7 +6,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 
 import LandingPage from "./pages/LandingPage";
 
-
+import CustomerRegisterPage from "./pages/CustomerRegisterPage";
 import CustomerLoginPage from "./pages/CustomerLoginPage";
 import CustomerOnboardingPage from "./pages/CustomerOnboardingPage";
 
@@ -51,7 +51,7 @@ export default function App() {
           {/* Customer Authentication */}
           <Route
             path="/customer/register"
-            element={<CustomerOnboardingPage />}
+            element={<CustomerRegisterPage />}
           />
 
           <Route
