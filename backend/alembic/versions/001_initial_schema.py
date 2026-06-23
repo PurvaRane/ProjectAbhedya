@@ -66,7 +66,7 @@ def upgrade() -> None:
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column("mobile_number", sa.String(15), nullable=True),
         sa.Column("email", sa.String(255), nullable=True),
-        sa.Column("otp_code", sa.String(10), nullable=False),
+        sa.Column("otp_code", sa.String(64), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("verified", sa.Boolean(), nullable=False, server_default=sa.text("false")),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),

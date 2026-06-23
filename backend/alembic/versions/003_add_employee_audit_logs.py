@@ -1,7 +1,7 @@
 """add employee audit logs
 
 Revision ID: 003_add_employee_audit_logs
-Revises: 002_add_aadhaar_fields
+Revises: 002_add_aadhaar
 Create Date: 2026-06-20
 """
 

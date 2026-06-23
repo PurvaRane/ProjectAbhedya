@@ -10,7 +10,11 @@ from app.core.security import (
     verify_password,
 )
 from app.db.models import User
-from app.db.repositories import EmployeeRepository, UserRepository
+from app.db.repositories import (
+    EmployeeAuditRepository,
+    EmployeeRepository,
+    UserRepository,
+)
 from app.schemas.auth import (
     AadhaarCompleteRegistrationRequest,
     AadhaarRegistrationRequest,
@@ -19,6 +23,7 @@ from app.schemas.auth import (
     EmployeeLoginRequest,
     MobileCompleteRegistrationRequest,
     TokenResponse,
+    EmployeeAuditLogResponse
 )
 from app.services.otp_service import OTPService
 
@@ -28,8 +33,9 @@ class AuthService:
         self.db = db
         self.user_repo = UserRepository(db)
         self.employee_repo = EmployeeRepository(db)
+        self.audit_repo = EmployeeAuditRepository(db)
         self.otp_service = OTPService(db)
-
+    
     # ---------------------------------------------------
     # EMAIL REGISTRATION
     # ---------------------------------------------------
@@ -282,14 +288,36 @@ class AuthService:
                 employee.password_hash,
             )
         ):
+
+            self.audit_repo.create_log(
+                action="LOGIN",
+                status="FAILED",
+                details=f"Failed login attempt for {data.email}",
+            )
+
             raise ValueError(
                 "Invalid credentials"
             )
 
         if not employee.is_active:
+
+            self.audit_repo.create_log(
+                action="LOGIN",
+                status="FAILED",
+                employee_id=employee.id,
+                details="Employee account deactivated",
+            )
+
             raise ValueError(
                 "Employee account is deactivated"
             )
+
+        self.audit_repo.create_log(
+            action="LOGIN",
+            status="SUCCESS",
+            employee_id=employee.id,
+            details=f"{employee.role.value} login successful",
+        )
 
         return TokenResponse(
             access_token=create_access_token(
@@ -304,3 +332,90 @@ class AuthService:
             role=employee.role.value,
             actor_type="employee",
         )
+    
+    def initiate_employee_login(
+        self,
+        data: EmployeeLoginRequest,
+    ):
+        employee = self.employee_repo.get_by_email(
+            data.email
+        )
+
+        if (
+            not employee
+            or not verify_password(
+                data.password,
+                employee.password_hash,
+            )
+        ):
+            raise ValueError(
+                "Invalid credentials"
+            )
+
+        if not employee.is_active:
+            raise ValueError(
+                "Employee account is deactivated"
+            )
+
+        self.otp_service.send_email_otp(
+            employee.email
+        )
+
+        return {
+            "message": "OTP sent successfully",
+            "otp_sent": True,
+        }
+    def verify_employee_otp(
+        self,
+        email: str,
+        otp_code: str,
+    ) -> TokenResponse:
+
+        employee = self.employee_repo.get_by_email(email)
+
+        if not employee:
+            raise ValueError("Employee not found")
+
+        if not self.otp_service.verify_email_otp(
+            email,
+            otp_code,
+        ):
+            self.audit_repo.create_log(
+                action="LOGIN",
+                status="FAILED",
+                employee_id=employee.id,
+                details="Invalid OTP",
+            )
+
+            raise ValueError(
+                "Invalid or expired OTP"
+            )
+
+        self.audit_repo.create_log(
+            action="LOGIN",
+            status="SUCCESS",
+            employee_id=employee.id,
+            details=f"{employee.role.value} login successful",
+        )
+
+        return TokenResponse(
+            access_token=create_access_token(
+                str(employee.id),
+                employee.role.value,
+                "employee",
+            ),
+            refresh_token=create_refresh_token(
+                str(employee.id),
+                "employee",
+            ),
+            role=employee.role.value,
+            actor_type="employee",
+        )
+    # ---------------------------------------------------
+    # AUDIT LOGS
+    # ---------------------------------------------------
+
+    def get_employee_audit_logs(
+        self,
+    ):
+        return self.audit_repo.get_logs()

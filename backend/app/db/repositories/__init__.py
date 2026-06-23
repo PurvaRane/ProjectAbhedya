@@ -4,8 +4,14 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password, sanitize_email, sanitize_mobile, sanitize_string
-from app.db.models import EmployeeAccount, EmployeeRole, OTPVerification, User, UserRole
-
+from app.db.models import (
+    EmployeeAccount,
+    EmployeeAuditLog,
+    EmployeeRole,
+    OTPVerification,
+    User,
+    UserRole,
+)
 
 class UserRepository:
     def __init__(self, db: Session):
@@ -134,6 +140,48 @@ class EmployeeRepository:
 
     def count(self) -> int:
         return self.db.query(EmployeeAccount).count()
+
+class EmployeeAuditRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def create_log(
+        self,
+        action: str,
+        status: str,
+        employee_id: UUID | None = None,
+        ip_address: str | None = None,
+        device_id: str | None = None,
+        details: str | None = None,
+    ) -> EmployeeAuditLog:
+
+        log = EmployeeAuditLog(
+            employee_id=employee_id,
+            action=action,
+            status=status,
+            ip_address=ip_address,
+            device_id=device_id,
+            details=details,
+        )
+
+        self.db.add(log)
+        self.db.commit()
+        self.db.refresh(log)
+
+        return log
+        
+    def get_logs(
+        self,
+        limit: int = 100,
+    ):
+        return (
+            self.db.query(EmployeeAuditLog)
+            .order_by(
+                EmployeeAuditLog.created_at.desc()
+            )
+            .limit(limit)
+            .all()
+        )
 
 
 class OTPRepository:

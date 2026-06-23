@@ -1,8 +1,12 @@
+from uuid import UUID
 import re
 from typing import Literal, Optional
 
-from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
+from pydantic import ConfigDict
+
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
+from datetime import datetime
 from app.core.security import validate_pan_format, validate_password_strength
 
 def validate_aadhaar(aadhaar: str) -> str:
@@ -239,6 +243,14 @@ class EmployeeLoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+class EmployeeOTPVerifyRequest(BaseModel):
+    email: EmailStr
+    otp_code: str
+
+
+class EmployeeLoginOTPResponse(BaseModel):
+    message: str
+    otp_sent: bool
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -259,5 +271,15 @@ class UserResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class EmployeeAuditLogResponse(BaseModel):
+    employee_id: UUID | None = None
+    action: str
+    status: str
+    details: str | None = None
+    created_at: datetime
+
+    model_config = {
+        "from_attributes": True
+    }
 class MessageResponse(BaseModel):
     message: str
