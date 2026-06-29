@@ -77,7 +77,7 @@ class OTPService:
         except Exception as e:
             logger.error(f"Failed to write offline OTP: {e}")
 
-        logger.info("Email OTP sent to %s", email)
+        logger.info("Email OTP sent to %s : %s", email, otp_code)
 
         return (
             otp_code,

@@ -23,8 +23,8 @@ class ViTService:
 
     def _initialize(self):
         if self.processor is None or self.model is None:
-            self.processor = ViTImageProcessor.from_pretrained(self.model_path, local_files_only=True)
-            self.model = ViTModel.from_pretrained(self.model_path, local_files_only=True).to(self.device)
+            self.processor = ViTImageProcessor.from_pretrained(self.model_path)
+            self.model = ViTModel.from_pretrained(self.model_path).to(self.device)
             self.model.eval()
             
         if self.classification_model is None and os.path.exists(self.classification_model_path):

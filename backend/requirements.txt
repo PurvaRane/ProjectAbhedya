@@ -23,6 +23,7 @@ twilio==9.4.0
 opencv-python==4.6.0.66
 numpy==1.26.4
 pillow==12.2.0
+pytesseract==0.3.10
 
 insightface==0.7.3
 onnxruntime==1.22.1

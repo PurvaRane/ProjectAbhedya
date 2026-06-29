@@ -1,5 +1,6 @@
 import json
 import logging
+import concurrent.futures
 from PIL import Image
 from sqlalchemy.orm import Session
 
@@ -192,66 +193,71 @@ class DocumentPipelineService:
                 
             width, height = image.size
 
-            # 1. Extract OCR
-            ocr_results = self.ocr_service.extract(file_path)
-            raw_text = ocr_results["text"]
-            lines = ocr_results["lines"]
-            
-            # 1.5 Extract and Verify QR Code
-            qr_data = qr_service.extract_qr_data(file_path)
-            if qr_data:
-                logger.info(f"QR Code Data Extracted: {qr_data}")
-                # Cross-check Aadhaar/PAN Name ('n' or 'name' attribute in XML/JSON)
-                qr_name = qr_data.get('n', qr_data.get('name', ''))
-                if qr_name and qr_name.upper() not in raw_text.upper():
-                    logger.warning(f"Document {document.id} rejected: QR Name '{qr_name}' not found in OCR text!")
-                    forgery_features = {
-                        "qr_mismatch": True,
-                        "rejection_reason": f"Cryptographic Identity Mismatch: Secure QR Code states name is '{qr_name}' but it was not found on the physical card.",
-                        "qr_data": qr_data
-                    }
-                    analysis = DocumentAnalysis(
-                        document_id=document.id,
-                        forgery_features=json.dumps(forgery_features),
-                        preliminary_fraud_score=1.0 # 100% fraud mathematically proven
-                    )
-                    db.add(analysis)
-                    document.status = DocumentUploadStatus.REJECTED
-                    db.commit()
-                    return
-            
-            words = []
-            boxes = []
-            
-            for line in lines:
-                text = line["text"]
-                bbox = line["bbox"]
+            # Define tasks to run concurrently
+            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+                # Stage 1: Independent tasks
+                future_ocr = executor.submit(self.ocr_service.extract, file_path)
+                future_qr = executor.submit(qr_service.extract_qr_data, file_path)
+                future_vit_emb = executor.submit(vit_service.extract_visual_embedding, image)
+                future_vit_prob = executor.submit(vit_service.predict_forgery, image)
+                future_ela = executor.submit(forgery_service.perform_ela, file_path)
+                future_meta = executor.submit(forgery_service.extract_metadata, file_path)
+
+                # Wait for OCR and QR code
+                ocr_results = future_ocr.result()
+                raw_text = ocr_results["text"]
+                lines = ocr_results["lines"]
                 
-                # Split line into words, approximate word bounding boxes
-                words.append(text)
-                boxes.append(self._normalize_box(bbox, width, height))
+                qr_data = future_qr.result()
+                if qr_data:
+                    logger.info(f"QR Code Data Extracted: {qr_data}")
+                    # Cross-check Aadhaar/PAN Name
+                    qr_name = qr_data.get('n', qr_data.get('name', ''))
+                    if qr_name and qr_name.upper() not in raw_text.upper():
+                        logger.warning(f"Document {document.id} rejected: QR Name '{qr_name}' not found in OCR text!")
+                        forgery_features = {
+                            "qr_mismatch": True,
+                            "rejection_reason": f"Cryptographic Identity Mismatch: Secure QR Code states name is '{qr_name}' but it was not found on the physical card.",
+                            "qr_data": qr_data
+                        }
+                        analysis = DocumentAnalysis(
+                            document_id=document.id,
+                            forgery_features=json.dumps(forgery_features),
+                            preliminary_fraud_score=1.0 # 100% fraud mathematically proven
+                        )
+                        db.add(analysis)
+                        document.status = DocumentUploadStatus.REJECTED
+                        db.commit()
+                        return
 
-            # 2. Extract Layout and LayoutLMv3 AI Forgery Prediction
-            layout_entities = layoutlm_service.extract_layout_fields(image, words, boxes)
-            layoutlm_forgery_prob = layoutlm_service.predict_forgery(image, words, boxes)
-            
-            # 3. Extract Visual Embedding and ViT AI Forgery Prediction
-            vit_embedding = vit_service.extract_visual_embedding(image)
-            vit_forgery_prob = vit_service.predict_forgery(image)
-            
-            # Extract Structured Entities with Bounding Boxes for Cross-Validation and Tampering Detection
-            extracted_entities = self._extract_document_entities(lines)
+                words = []
+                boxes = []
+                for line in lines:
+                    text = line["text"]
+                    bbox = line["bbox"]
+                    words.append(text)
+                    boxes.append(self._normalize_box(bbox, width, height))
 
-            # 4. Forgery Detection (ELA, Metadata, CMFD)
-            forgery_data = forgery_service.perform_ela(file_path)
-            ela_score = forgery_data.get("ela_score", 0.0)
-            
-            meta_data = forgery_service.extract_metadata(file_path)
-            metadata_anomaly = meta_data.get("metadata_anomaly_score", 0.0)
-            
-            cmfd_data = forgery_service.detect_copy_move(file_path, extracted_entities)
-            cmfd_score = cmfd_data.get("cmfd_score", 0.0)
-            tampered_fields = cmfd_data.get("tampered_fields", [])
+                # Stage 2: Dependent tasks
+                future_layout = executor.submit(layoutlm_service.extract_layout_fields, image, words, boxes)
+                future_layout_prob = executor.submit(layoutlm_service.predict_forgery, image, words, boxes)
+                extracted_entities = self._extract_document_entities(lines)
+                future_cmfd = executor.submit(forgery_service.detect_copy_move, file_path, extracted_entities)
+
+                # Wait for all remaining futures
+                vit_embedding = future_vit_emb.result()
+                vit_forgery_prob = future_vit_prob.result()
+                forgery_data = future_ela.result()
+                ela_score = forgery_data.get("ela_score", 0.0)
+                meta_data = future_meta.result()
+                metadata_anomaly = meta_data.get("metadata_anomaly_score", 0.0)
+
+                layout_entities = future_layout.result()
+                layoutlm_forgery_prob = future_layout_prob.result()
+                
+                cmfd_data = future_cmfd.result()
+                cmfd_score = cmfd_data.get("cmfd_score", 0.0)
+                tampered_fields = cmfd_data.get("tampered_fields", [])
             
             # 5. Explainable AI Risk Scoring (SHAP) - Now enhanced with Deep Learning Models!
             layout_entities_count = len(layout_entities)

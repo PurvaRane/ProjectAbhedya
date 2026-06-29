@@ -58,7 +58,10 @@ class RiskService:
             if isinstance(self.explainer.expected_value, list):
                 base_value = float(self.explainer.expected_value[1])
             elif isinstance(self.explainer.expected_value, np.ndarray):
-                base_value = float(self.explainer.expected_value[1])
+                try:
+                    base_value = float(self.explainer.expected_value[1])
+                except (IndexError, TypeError):
+                    base_value = float(self.explainer.expected_value)
             else:
                 base_value = float(self.explainer.expected_value)
                 

@@ -19,8 +19,13 @@ class ImageQualityService:
         Returns {"is_acceptable": bool, "blur_score": float, "glare_score": float, "reason": str}
         """
         try:
-            # Read image using OpenCV
-            img = cv2.imread(file_path)
+            # Read image robustly using numpy to handle special characters in paths
+            try:
+                file_bytes = np.fromfile(file_path, dtype=np.uint8)
+                img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+            except Exception:
+                img = None
+
             if img is None:
                 return {
                     "is_acceptable": False,

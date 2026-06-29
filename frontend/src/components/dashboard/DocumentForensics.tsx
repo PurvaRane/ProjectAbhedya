@@ -103,6 +103,20 @@ export default function DocumentForensics() {
       statements.push({ text: "The structural layout perfectly matches the expected geometric density of a genuine document.", type: "success" });
     }
 
+    // ViT
+    if (c.vit_forgery_prob > 0.05) {
+      statements.push({ text: "Vision Transformer (ViT) detected visual inconsistencies (lighting, pixel-level manipulation, or synthetic generation artifacts) indicative of a forgery.", type: "danger" });
+    } else if (c.vit_forgery_prob < -0.05) {
+      statements.push({ text: "Vision Transformer (ViT) analysis confirms authentic visual characteristics with no signs of manipulation.", type: "success" });
+    }
+
+    // LayoutLMv3
+    if (c.layoutlm_forgery_prob > 0.05) {
+      statements.push({ text: "LayoutLMv3 Multimodal AI detected structural inconsistencies between the text content and geometric positioning, indicating template tampering.", type: "danger" });
+    } else if (c.layoutlm_forgery_prob < -0.05) {
+      statements.push({ text: "LayoutLMv3 Multimodal AI confirms the text-to-layout alignment is authentic.", type: "success" });
+    }
+
     // Cross-Document GNN Conflicts
     if (features.cross_document_conflicts && features.cross_document_conflicts.length > 0) {
       features.cross_document_conflicts.forEach((conflict: string) => {

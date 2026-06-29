@@ -35,8 +35,8 @@ class LayoutLMService:
 
     def _initialize(self):
         if self.processor is None or self.model is None:
-            self.processor = LayoutLMv3Processor.from_pretrained(self.model_path, apply_ocr=False, local_files_only=True)
-            self.model = LayoutLMv3ForTokenClassification.from_pretrained(self.model_path, local_files_only=True).to(self.device)
+            self.processor = LayoutLMv3Processor.from_pretrained(self.model_path, apply_ocr=False)
+            self.model = LayoutLMv3ForTokenClassification.from_pretrained(self.model_path).to(self.device)
             self.model.eval()
             
         if self.seq_model is None and os.path.exists(self.seq_model_path):
