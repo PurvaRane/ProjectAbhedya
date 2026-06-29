@@ -52,7 +52,21 @@ logs/
 *.sql
 *.dump
 
+# AI Data and Models (Too large for GitHub)
+backend/datasets/
 backend/uploads/
+
+# Ignore base models and checkpoints, but track finetuned models
+backend/app/models/hf/
+backend/models/hf/
+backend/models/layoutlmv3_finetuned/checkpoint-*
+backend/models/vit_finetuned/checkpoint-*
+
+# Python
 __pycache__/
 *.pyc
-.env
+.venv/
+venv/
+*.log
+
+# Git LFS

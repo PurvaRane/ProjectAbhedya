@@ -242,15 +242,30 @@ class CustomerLoginRequest(BaseModel):
 class EmployeeLoginRequest(BaseModel):
     email: EmailStr
     password: str
+    
+    # Security parameters
+    device_id: str
+    captcha_token: str
+    captcha_answer: str
+    
+    # Behavioral parameters
+    typing_speed_ms: int = 0
+    mouse_clicks: int = 0
 
 class EmployeeOTPVerifyRequest(BaseModel):
     email: EmailStr
     otp_code: str
+    device_id: str
 
+class EmployeeFaceVerifyRequest(BaseModel):
+    email: EmailStr
+    image_base64: str
+    device_id: str
 
-class EmployeeLoginOTPResponse(BaseModel):
+class EmployeeLoginStepResponse(BaseModel):
     message: str
-    otp_sent: bool
+    next_step: Literal["REQUIRE_OTP", "REQUIRE_FACE", "SUCCESS"]
+    token_data: Optional[dict] = None
 
 class TokenResponse(BaseModel):
     access_token: str

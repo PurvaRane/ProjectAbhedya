@@ -103,8 +103,25 @@ export const authApi = {
   customerLogin: (data: { identifier: string; password: string }) =>
     apiClient.post<TokenResponse>("/auth/customer/login", data),
 
-  employeeLogin: (data: { email: string; password: string }) =>
-    apiClient.post<TokenResponse>("/auth/employee/login", data),
+  getEmployeeCaptcha: () => 
+    apiClient.get<{question: string; token: string}>("/auth/employee/captcha"),
+    
+  employeeLoginStep1: (data: {
+    email: string;
+    password: string;
+    device_id: string;
+    captcha_token: string;
+    captcha_answer: string;
+    typing_speed_ms: number;
+    mouse_clicks: number;
+  }) =>
+    apiClient.post<{ message: string; next_step: "REQUIRE_OTP" | "REQUIRE_FACE" | "SUCCESS" }>("/auth/employee/login", data),
+
+  employeeVerifyOTP: (data: { email: string; otp_code: string; device_id: string }) =>
+    apiClient.post<{ message: string; next_step: "REQUIRE_FACE" | "SUCCESS" }>("/auth/employee/verify-otp", data),
+
+  employeeVerifyFace: (data: { email: string; image_base64: string; device_id: string }) =>
+    apiClient.post<TokenResponse>("/auth/employee/verify-face", data),
 };
 
 export function getErrorMessage(error: unknown): string {

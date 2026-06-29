@@ -31,14 +31,18 @@ class SmsService:
         return self.twilio_configured or self.fast2sms_configured
 
     def send_otp_sms(self, mobile_number: str, otp_code: str) -> bool:
-        if self.twilio_configured and self._send_via_twilio(mobile_number, otp_code):
-            return True
-
-        if self.fast2sms_configured and self._send_via_fast2sms(mobile_number, otp_code):
-            return True
-
-        logger.info("SMS not configured or all providers failed. OTP for +91%s: %s", mobile_number, otp_code)
-        return False
+        # FOR 100% OFFLINE MODE: Bypass Twilio and Fast2SMS completely.
+        # We just print the OTP to the console so the user/teller can see it.
+        logger.info(f"\n======================================================\n[OFFLINE SMS SIMULATION] To: +91{mobile_number}\nOTP Code: {otp_code}\n======================================================\n")
+        
+        # We can also attempt to write it to a local file for easy retrieval
+        try:
+            with open("offline_otps.log", "a") as f:
+                f.write(f"To: +91{mobile_number} | OTP: {otp_code}\n")
+        except:
+            pass
+            
+        return True
 
     def _format_e164(self, mobile_number: str) -> str:
         digits = mobile_number.strip()

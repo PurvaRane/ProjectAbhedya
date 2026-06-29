@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     fast2sms_api_key: str = ""
     fast2sms_otp_id: str = ""
 
-    cors_origins: str = "http://localhost:5173,http://localhost:5174,http://localhost:3000"
+    cors_origins: str = "http://localhost:5173,http://localhost:5174,http://localhost:3000,http://192.168.1.5:5173"
 
     @field_validator("smtp_user", "smtp_password", "smtp_from", mode="before")
     @classmethod

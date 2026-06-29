@@ -71,6 +71,12 @@ class OTPService:
             otp_code,
         )
 
+        try:
+            with open("offline_otps.log", "a") as f:
+                f.write(f"{datetime.now().isoformat()} - Email OTP for {email}: {otp_code}\n")
+        except Exception as e:
+            logger.error(f"Failed to write offline OTP: {e}")
+
         logger.info("Email OTP sent to %s", email)
 
         return (
@@ -90,6 +96,12 @@ class OTPService:
             otp_code=otp_hash,
             expires_at=self._expires_at(),
         )
+
+        try:
+            with open("offline_otps.log", "a") as f:
+                f.write(f"{datetime.now().isoformat()} - Mobile OTP for +91{mobile_number}: {otp_code}\n")
+        except Exception as e:
+            logger.error(f"Failed to write offline OTP: {e}")
 
         logger.info(
             "DEMO OTP for +91%s : %s",

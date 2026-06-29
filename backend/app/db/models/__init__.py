@@ -99,6 +99,18 @@ class User(Base):
         nullable=False,
     )
 
+    # TRACKING FIELDS FOR GNN
+    last_ip_address: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+
+    last_device_id: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        index=True,
+    )
+
 
 class EmployeeAccount(Base):
     __tablename__ = "employee_accounts"
@@ -110,6 +122,11 @@ class EmployeeAccount(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[EmployeeRole] = mapped_column(Enum(EmployeeRole), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    
+    # SECURITY & MFA FIELDS
+    face_embedding: Mapped[str | None] = mapped_column(String, nullable=True)
+    trusted_device_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -171,6 +188,61 @@ class OTPVerification(Base):
     otp_code: Mapped[str] = mapped_column(String(64), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+class DocumentUploadStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    VERIFIED = "VERIFIED"
+    NEEDS_REVIEW = "NEEDS_REVIEW"
+    REJECTED = "REJECTED"
+
+class Document(Base):
+    __tablename__ = "documents"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), index=True, nullable=False
+    )
+    document_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    file_path: Mapped[str] = mapped_column(String(500), nullable=False)
+    status: Mapped[DocumentUploadStatus] = mapped_column(
+        Enum(DocumentUploadStatus), default=DocumentUploadStatus.PENDING, nullable=False
+    )
+    
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+class DocumentAnalysis(Base):
+    __tablename__ = "document_analyses"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), unique=True, index=True, nullable=False
+    )
+    
+    ocr_raw_text: Mapped[str | None] = mapped_column(String, nullable=True)
+    layout_entities: Mapped[str | None] = mapped_column(String, nullable=True) # JSON array of {label, text, box}
+    vit_embedding: Mapped[str | None] = mapped_column(String, nullable=True) # JSON array of 768 floats
+    forgery_features: Mapped[str | None] = mapped_column(String, nullable=True) # JSON object
+    
+    preliminary_fraud_score: Mapped[float | None] = mapped_column(nullable=True)
+    
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

@@ -20,9 +20,36 @@ email-validator==2.2.0
 httpx==0.28.1
 twilio==9.4.0
 
-opencv-python==4.13.0.92
-numpy==2.4.6
+opencv-python==4.6.0.66
+numpy==1.26.4
 pillow==12.2.0
 
 insightface==0.7.3
 onnxruntime==1.22.1
+
+# OCR — PaddleOCR 2.7.3 + PaddlePaddle 2.6.2 (stable on macOS ARM64 + Python 3.11)
+paddleocr==2.7.3
+paddlepaddle==2.6.2
+paddle2onnx==1.3.1
+
+# LayoutLMv3 & ViT
+transformers==4.53.0
+torch==2.7.1
+torchvision==0.22.1
+tokenizers==0.21.2
+accelerate==1.8.1
+datasets==3.2.0
+
+# Explainable AI
+shap==0.48.0
+
+# Graph Neural Networks
+torch-geometric==2.6.1
+
+# Data Processing
+pandas==2.3.0
+scikit-learn==1.7.0
+scipy==1.16.0
+
+# Visualization
+matplotlib==3.10.3

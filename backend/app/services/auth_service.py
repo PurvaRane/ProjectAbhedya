@@ -120,14 +120,21 @@ class AuthService:
         if self.user_repo.get_by_mobile(data.mobile_number):
             raise ValueError("Mobile number is already registered")
 
-        return self.user_repo.create(
-            full_name=data.full_name,
-            email=data.email,
-            mobile_number=data.mobile_number,
-            pan_number=data.pan_number,
-            password_hash=hash_password(data.password),
-            is_active=True,
-        )
+        from sqlalchemy.exc import IntegrityError
+        try:
+            return self.user_repo.create(
+                full_name=data.full_name,
+                email=data.email,
+                mobile_number=data.mobile_number,
+                pan_number=data.pan_number,
+                password_hash=hash_password(data.password),
+                is_active=True,
+            )
+        except IntegrityError as e:
+            self.db.rollback()
+            if "users_pan_number_key" in str(e):
+                raise ValueError("PAN number is already registered")
+            raise ValueError("Registration failed due to a duplicate unique identifier.")
 
     # ---------------------------------------------------
     # AADHAAR REGISTRATION
@@ -191,18 +198,25 @@ class AuthService:
                 "Mobile already registered"
             )
 
-        return self.user_repo.create(
-            full_name=data.full_name,
-            email=data.email,
-            mobile_number=data.mobile_number,
-            pan_number=data.pan_number,
-            aadhaar_number=data.aadhaar_number,
-            aadhaar_verified=True,
-            password_hash=hash_password(
-                data.password
-            ),
-            is_active=True,
-        )
+        from sqlalchemy.exc import IntegrityError
+        try:
+            return self.user_repo.create(
+                full_name=data.full_name,
+                email=data.email,
+                mobile_number=data.mobile_number,
+                pan_number=data.pan_number,
+                aadhaar_number=data.aadhaar_number,
+                aadhaar_verified=True,
+                password_hash=hash_password(
+                    data.password
+                ),
+                is_active=True,
+            )
+        except IntegrityError as e:
+            self.db.rollback()
+            if "users_pan_number_key" in str(e):
+                raise ValueError("PAN number is already registered")
+            raise ValueError("Registration failed due to a duplicate unique identifier.")
 
     # ---------------------------------------------------
     # CUSTOMER LOGIN
@@ -337,80 +351,163 @@ class AuthService:
         self,
         data: EmployeeLoginRequest,
     ):
-        employee = self.employee_repo.get_by_email(
-            data.email
-        )
+        from app.services.captcha_service import CaptchaService
+        
+        employee = self.employee_repo.get_by_email(data.email)
 
-        if (
-            not employee
-            or not verify_password(
-                data.password,
-                employee.password_hash,
+        # 1. Human Presence Attestation (Offline CAPTCHA)
+        if not CaptchaService.verify_captcha(data.captcha_token, data.captcha_answer):
+            self.audit_repo.create_log(
+                action="LOGIN", status="FAILED", employee_id=employee.id if employee else None, details="CAPTCHA failed"
             )
-        ):
-            raise ValueError(
-                "Invalid credentials"
+            raise ValueError("Human presence verification failed. Incorrect CAPTCHA.")
+
+        # 2. Credentials Verification
+        if not employee or not verify_password(data.password, employee.password_hash):
+            self.audit_repo.create_log(
+                action="LOGIN", status="FAILED", employee_id=employee.id if employee else None, details="Invalid credentials"
             )
+            raise ValueError("Invalid credentials")
 
         if not employee.is_active:
-            raise ValueError(
-                "Employee account is deactivated"
-            )
+            raise ValueError("Employee account is deactivated")
 
-        self.otp_service.send_email_otp(
-            employee.email
+        # 3. Behavioral Confidence Scoring (BCS) & Device Trust
+        # Simple heuristic: typing speed between 500ms and 15000ms is considered human-like.
+        # Too fast (< 500ms) = likely a bot/script pasting.
+        bcs_score = 100
+        if data.typing_speed_ms < 500:
+            bcs_score -= 50
+            
+        device_trusted = (employee.trusted_device_id == data.device_id) and data.device_id is not None
+        
+        if not device_trusted:
+            bcs_score -= 30
+            
+        self.audit_repo.create_log(
+            action="LOGIN_INIT", 
+            status="PENDING", 
+            employee_id=employee.id, 
+            details=f"BCS Score: {bcs_score}. Device trusted: {device_trusted}"
         )
 
+        # 4. State Machine Decision
+        if bcs_score < 80:
+            # Require OTP for low confidence or untrusted device
+            self.otp_service.send_email_otp(employee.email)
+            return {
+                "message": "Security check triggered. OTP sent.",
+                "next_step": "REQUIRE_OTP"
+            }
+        
+        # High confidence, skip OTP and proceed to Face Verification
         return {
-            "message": "OTP sent successfully",
-            "otp_sent": True,
+            "message": "Credentials verified.",
+            "next_step": "REQUIRE_FACE"
         }
+
     def verify_employee_otp(
         self,
         email: str,
         otp_code: str,
-    ) -> TokenResponse:
-
+        device_id: str
+    ):
         employee = self.employee_repo.get_by_email(email)
 
         if not employee:
             raise ValueError("Employee not found")
 
-        if not self.otp_service.verify_email_otp(
-            email,
-            otp_code,
-        ):
+        if not self.otp_service.verify_email_otp(email, otp_code):
             self.audit_repo.create_log(
-                action="LOGIN",
-                status="FAILED",
-                employee_id=employee.id,
-                details="Invalid OTP",
+                action="LOGIN", status="FAILED", employee_id=employee.id, details="Invalid OTP"
             )
-
-            raise ValueError(
-                "Invalid or expired OTP"
-            )
+            raise ValueError("Invalid or expired OTP")
 
         self.audit_repo.create_log(
-            action="LOGIN",
-            status="SUCCESS",
-            employee_id=employee.id,
-            details=f"{employee.role.value} login successful",
+            action="LOGIN_OTP", status="SUCCESS", employee_id=employee.id, details="OTP verified successfully"
         )
 
-        return TokenResponse(
-            access_token=create_access_token(
-                str(employee.id),
-                employee.role.value,
-                "employee",
-            ),
-            refresh_token=create_refresh_token(
-                str(employee.id),
-                "employee",
-            ),
-            role=employee.role.value,
-            actor_type="employee",
-        )
+        return {
+            "message": "OTP verified.",
+            "next_step": "REQUIRE_FACE"
+        }
+        
+    def verify_employee_face(
+        self,
+        email: str,
+        image_base64: str,
+        device_id: str
+    ) -> TokenResponse:
+        import base64
+        from app.services.face_service import FaceService
+        
+        employee = self.employee_repo.get_by_email(email)
+        if not employee:
+            raise ValueError("Employee not found")
+            
+        try:
+            # Decode base64 image
+            if "," in image_base64:
+                image_base64 = image_base64.split(",")[1]
+            image_bytes = base64.b64decode(image_base64)
+            
+            face_service = FaceService()
+            
+            # --- DEVELOPMENT BOOTSTRAP: Auto-enroll face if missing ---
+            if not employee.face_embedding:
+                import json
+                embedding = face_service.extract_embedding_from_bytes(image_bytes)
+                employee.face_embedding = json.dumps(embedding)
+                employee.trusted_device_id = device_id
+                self.db.commit()
+                
+                self.audit_repo.create_log(
+                    action="LOGIN_ENROLL", status="SUCCESS", employee_id=employee.id, details="Face auto-enrolled."
+                )
+                similarity = 1.0 # Auto-pass on enrollment
+            else:
+                # Normal Verification
+                similarity = face_service.compare_with_stored_embedding(employee.face_embedding, image_bytes)
+                
+                # Threshold for buffalo_l model is typically ~0.4 - 0.5. We use 0.5 for high security.
+                if similarity < 0.5:
+                    self.audit_repo.create_log(
+                        action="LOGIN", status="FAILED", employee_id=employee.id, details=f"Face verification failed (Score: {similarity:.2f})"
+                    )
+                    raise ValueError("Face verification failed. Please try again.")
+                    
+            # SUCCESS
+            # Update trusted device
+            employee.trusted_device_id = device_id
+            self.db.commit()
+            
+            self.audit_repo.create_log(
+                action="LOGIN",
+                status="SUCCESS",
+                employee_id=employee.id,
+                details=f"{employee.role.value} login fully authenticated. Face similarity: {similarity:.2f}",
+                device_id=device_id
+            )
+
+            return TokenResponse(
+                access_token=create_access_token(
+                    str(employee.id),
+                    employee.role.value,
+                    "employee",
+                ),
+                refresh_token=create_refresh_token(
+                    str(employee.id),
+                    "employee",
+                ),
+                role=employee.role.value,
+                actor_type="employee",
+            )
+            
+        except Exception as e:
+            self.audit_repo.create_log(
+                action="LOGIN", status="FAILED", employee_id=employee.id, details=f"Face processing error: {str(e)}"
+            )
+            raise ValueError(f"Face verification error: {str(e)}")
     # ---------------------------------------------------
     # AUDIT LOGS
     # ---------------------------------------------------

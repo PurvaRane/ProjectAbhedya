@@ -86,17 +86,10 @@ export default function LandingPage() {
                 </ul>
                 <div className="flex flex-col gap-3">
                   <Link
-                    to="/aadhaar/register"
+                    to="/customer/register"
                     className="btn-primary text-center"
                   >
-                    Aadhaar + Face Registration
-                  </Link>
-
-                  <Link
-                    to="/customer/register"
-                    className="btn-gold text-center"
-                  >
-                    Mobile / Email Registration
+                    Customer Registration
                   </Link>
 
                   <Link
@@ -105,7 +98,6 @@ export default function LandingPage() {
                   >
                     Customer Login
                   </Link>
-
                 </div>
               </div>
             </article>
