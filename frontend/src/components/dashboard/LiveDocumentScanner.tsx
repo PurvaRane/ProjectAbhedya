@@ -76,9 +76,8 @@ export default function LiveDocumentScanner() {
     while (!resultFound && attempts < 10) {
       await new Promise(r => setTimeout(r, 2000));
       try {
-        const res = await apiClient.get("/analyst/fraud/documents");
-        const docs = res.data;
-        const myDoc = docs.find((d: any) => d.document_id === docId);
+        const res = await apiClient.get(`/customer/document/status/${docId}`);
+        const myDoc = res.data;
         
         if (myDoc && (myDoc.status === "COMPLETED" || myDoc.status === "REJECTED" || myDoc.status === "NEEDS_REVIEW")) {
           setFinalResult(myDoc);
