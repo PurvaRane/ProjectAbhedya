@@ -32,7 +32,7 @@ class CaptchaService:
         timestamp = int(time.time())
         data = f"{answer}:{timestamp}"
         
-        signature = hmac.new(
+        signature = hmac.HMAC(
             settings.jwt_secret_key.encode(),
             data.encode(),
             hashlib.sha256
@@ -65,7 +65,7 @@ class CaptchaService:
                 
             # Verify signature
             data = f"{original_answer}:{timestamp_str}"
-            expected_signature = hmac.new(
+            expected_signature = hmac.HMAC(
                 settings.jwt_secret_key.encode(),
                 data.encode(),
                 hashlib.sha256

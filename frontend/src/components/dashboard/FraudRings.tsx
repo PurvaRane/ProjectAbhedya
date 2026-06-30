@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "../../context/AuthContext";
-import { API_URL } from "../../api/client";
+import { apiClient } from "../../api/client";
 
 type FraudRingUser = {
   user_id: string;
@@ -11,7 +10,6 @@ type FraudRingUser = {
 };
 
 export default function FraudRings() {
-  const { accessToken } = useAuth();
   const [users, setUsers] = useState<FraudRingUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -23,14 +21,8 @@ export default function FraudRings() {
   const fetchFraudRings = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_URL}/api/analyst/fraud/rings/analyze`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`
-        }
-      });
-      if (!res.ok) throw new Error("Failed to fetch fraud rings");
-      const data = await res.json();
-      setUsers(data.fraud_rings || []);
+      const res = await apiClient.get("/analyst/fraud/rings/analyze");
+      setUsers(res.data.fraud_rings || []);
     } catch (err: any) {
       setError(err.message);
     } finally {

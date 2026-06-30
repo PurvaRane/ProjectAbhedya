@@ -68,9 +68,18 @@ export default function EmployeeDashboard() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifCount] = useState(3);
+  const [employeeInfo, setEmployeeInfo] = useState<{email: string, id: string} | null>(null);
 
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    import("../api/client").then(({ apiClient }) => {
+      apiClient.get("/auth/employee/me").then(({ data }) => {
+        setEmployeeInfo(data);
+      }).catch((e) => console.error("Failed to fetch employee info", e));
+    });
+  }, []);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -109,6 +118,8 @@ export default function EmployeeDashboard() {
 
   const currentNavLabel = navItems.find((n) => n.id === activeSection)?.label ?? "Dashboard";
   const displayRole = roleLabels[role || ""] || role || "Employee";
+  const displayEmail = employeeInfo?.email || "employee@veritrust.in";
+  const displayId = employeeInfo?.id ? employeeInfo.id.substring(0, 8).toUpperCase() : "EMP00000";
 
   return (
     <div className="dashboard-shell">
@@ -148,8 +159,8 @@ export default function EmployeeDashboard() {
         <div className="flex items-center gap-3">
           {/* Employee Info */}
           <div className="hidden md:block text-right mr-2">
-            <p className="text-sm font-bold text-white leading-tight">John Doe</p>
-            <p className="text-xs text-canara-gold leading-tight">EMP001245 · {displayRole}</p>
+            <p className="text-sm font-bold text-white leading-tight truncate w-32" title={displayEmail}>{displayEmail}</p>
+            <p className="text-xs text-canara-gold leading-tight">{displayId} · {displayRole}</p>
           </div>
 
           {/* Notification Bell */}
@@ -207,8 +218,8 @@ export default function EmployeeDashboard() {
               onClick={() => setProfileOpen((v) => !v)}
               className="flex items-center gap-2 rounded-lg px-3 py-2 text-white hover:bg-white/10 transition"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-canara-gold text-canara-blue-dark text-xs font-bold">
-                JD
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-canara-gold text-canara-blue-dark text-xs font-bold uppercase">
+                {displayEmail.substring(0, 2)}
               </div>
               <svg className="h-4 w-4 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -218,8 +229,8 @@ export default function EmployeeDashboard() {
             {profileOpen && (
               <div className="absolute right-0 top-12 z-50 w-56 rounded-xl border border-gray-200 bg-white shadow-xl">
                 <div className="border-b border-gray-100 px-4 py-3">
-                  <p className="font-bold text-gray-800">John Doe</p>
-                  <p className="text-xs text-gray-400">EMP001245 · {displayRole}</p>
+                  <p className="font-bold text-gray-800 truncate" title={displayEmail}>{displayEmail}</p>
+                  <p className="text-xs text-gray-400">{displayId} · {displayRole}</p>
                 </div>
                 <div className="py-1">
                   {[

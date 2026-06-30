@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import List
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 7
 
     otp_expire_minutes: int = 5
-    otp_rate_limit_seconds: int = 5
+    otp_rate_limit_seconds: int = 60
 
     smtp_host: str = "smtp.gmail.com"
     smtp_port: int = 587
@@ -74,6 +74,12 @@ class Settings(BaseSettings):
     @property
     def is_development(self) -> bool:
         return self.app_env.lower() in ("development", "dev", "local")
+
+    @model_validator(mode="after")
+    def validate_jwt_secret(self) -> 'Settings':
+        if self.jwt_secret_key.startswith("change-this") and not self.is_development:
+            raise RuntimeError("Insecure JWT secret key in production. Must be changed.")
+        return self
 
 
 @lru_cache

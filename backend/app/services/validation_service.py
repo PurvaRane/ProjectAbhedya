@@ -9,7 +9,8 @@ logger = logging.getLogger(__name__)
 
 class ValidationService:
     def __init__(self):
-        self.MIN_OCR_CONFIDENCE = 0.85
+        # Tesseract confidence varies wildly on noise/multilingual text. 0.60 is a realistic baseline.
+        self.MIN_OCR_CONFIDENCE = 0.60
         self.MIN_AGE = 18
         self.MAX_DEVICE_ACCOUNTS = 50
 
@@ -176,7 +177,7 @@ class ValidationService:
             return {"passed": True, "reason": "No DOB to cross-check."}
 
         # Find previous successful documents for this user
-        prev_docs = db.query(DocumentAnalysis).join(Document).filter(Document.user_id == user_id).all()
+        prev_docs = db.query(DocumentAnalysis).join(Document, DocumentAnalysis.document_id == Document.id).filter(Document.user_id == user_id).all()
         
         for doc in prev_docs:
             if doc.forgery_features:

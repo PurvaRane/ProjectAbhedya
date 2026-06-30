@@ -1,8 +1,7 @@
 import { createContext, useContext, useMemo, useState, ReactNode } from "react";
+import { apiClient } from "../api/client";
 
 interface AuthState {
-  accessToken: string | null;
-  refreshToken: string | null;
   role: string | null;
   actorType: "customer" | "employee" | null;
 }
@@ -10,8 +9,6 @@ interface AuthState {
 interface AuthContextValue extends AuthState {
   isAuthenticated: boolean;
   login: (tokens: {
-    access_token: string;
-    refresh_token: string;
     role: string;
     actor_type: "customer" | "employee";
   }) => void;
@@ -22,8 +19,6 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 function loadAuthState(): AuthState {
   return {
-    accessToken: localStorage.getItem("access_token"),
-    refreshToken: localStorage.getItem("refresh_token"),
     role: localStorage.getItem("role"),
     actorType: (localStorage.getItem("actor_type") as AuthState["actorType"]) || null,
   };
@@ -35,27 +30,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       ...auth,
-      isAuthenticated: Boolean(auth.accessToken),
+      isAuthenticated: Boolean(auth.role && auth.actorType),
       login: (tokens) => {
-        localStorage.setItem("access_token", tokens.access_token);
-        localStorage.setItem("refresh_token", tokens.refresh_token);
         localStorage.setItem("role", tokens.role);
         localStorage.setItem("actor_type", tokens.actor_type);
         setAuth({
-          accessToken: tokens.access_token,
-          refreshToken: tokens.refresh_token,
           role: tokens.role,
           actorType: tokens.actor_type,
         });
       },
       logout: () => {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
+        if (auth.actorType === "employee") {
+          apiClient.post("/auth/employee/logout").catch(() => {});
+        } else if (auth.actorType === "customer") {
+          apiClient.post("/auth/customer/logout").catch(() => {});
+        }
+        
         localStorage.removeItem("role");
         localStorage.removeItem("actor_type");
         setAuth({
-          accessToken: null,
-          refreshToken: null,
           role: null,
           actorType: null,
         });

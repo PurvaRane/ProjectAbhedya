@@ -3,9 +3,11 @@ import torch
 from PIL import Image
 from transformers import ViTImageProcessor, ViTModel, ViTForImageClassification
 
+import threading
+
 class ViTService:
     def __init__(self):
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         self.model_path = os.path.join(base_dir, "models", "hf", "vit-base")
         
         if not os.path.exists(self.model_path):
@@ -20,19 +22,23 @@ class ViTService:
         
         # Hardware acceleration for fast inference (MPS disabled due to macOS OpenCV threading bugs)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self._lock = threading.Lock()
 
     def _initialize(self):
-        if self.processor is None or self.model is None:
-            self.processor = ViTImageProcessor.from_pretrained(self.model_path)
-            self.model = ViTModel.from_pretrained(self.model_path).to(self.device)
-            self.model.eval()
-            
-        if self.classification_model is None and os.path.exists(self.classification_model_path):
-            try:
-                self.classification_model = ViTForImageClassification.from_pretrained(self.classification_model_path, local_files_only=True).to(self.device)
-                self.classification_model.eval()
-            except Exception as e:
-                print(f"Failed to load fine-tuned ViT: {e}")
+        # Always use the local fine-tuned model path to avoid HuggingFace network calls
+        with self._lock:
+            if self.processor is None or self.model is None:
+                self.processor = ViTImageProcessor.from_pretrained(self.classification_model_path, local_files_only=True)
+                
+            if self.classification_model is None and os.path.exists(self.classification_model_path):
+                try:
+                    self.classification_model = ViTForImageClassification.from_pretrained(self.classification_model_path, local_files_only=True).to(self.device)
+                    self.classification_model.eval()
+                    # Get the base model from the classification model
+                    self.model = self.classification_model.vit
+                    self.model.eval()
+                except Exception as e:
+                    print(f"Failed to load fine-tuned ViT: {e}")
 
     def extract_visual_embedding(self, image: Image.Image) -> list[float]:
         """
@@ -76,6 +82,11 @@ class ViTService:
         probs = torch.nn.functional.softmax(outputs.logits, dim=-1)
         # Class 1 is FORGED
         fraud_prob = probs[0][1].item()
-        return float(fraud_prob)
+        
+        # Normalize the raw probability (which heavily biases around 0.61 for baseline images)
+        # to a zero-centered severity score in range [-1.0, 1.0] for the frontend.
+        score = (fraud_prob - 0.65) * 10.0
+        
+        return float(max(min(score, 1.0), -1.0))
 
 vit_service = ViTService()

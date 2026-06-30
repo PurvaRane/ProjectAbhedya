@@ -16,6 +16,13 @@ class ForgeryService:
         Returns the ELA score and the path to the generated ELA heatmap image.
         """
         try:
+            if image_path.lower().endswith(".png"):
+                return {
+                    "ela_score": 0.0,
+                    "max_difference": 0,
+                    "heatmap_path": "",
+                    "note": "ELA skipped for PNG file"
+                }
             original = Image.open(image_path).convert('RGB')
             
             # Save the image at a specific quality level in memory

@@ -380,4 +380,7 @@ class GNNService:
                 })
                 
         results.sort(key=lambda x: x["risk_score"], reverse=True)
-        return {"fraud_rings": results}
+        return {
+            "fraud_rings": results,
+            "experimental_warning": "demo/experimental: GNN uses untrained weights for demonstration"
+        }

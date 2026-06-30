@@ -4,27 +4,9 @@ import { useAuth } from "../context/AuthContext";
 import DashboardLayout from "../components/DashboardLayout";
 import { apiClient } from "../api/client";
 
-function parseJwt(token: string) {
-  try {
-    const base64Url = token.split(".")[1];
-    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-    const jsonPayload = decodeURIComponent(
-      window
-        .atob(base64)
-        .split("")
-        .map(function (c) {
-          return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
-        })
-        .join("")
-    );
-    return JSON.parse(jsonPayload);
-  } catch (e) {
-    return null;
-  }
-}
 
 export default function CustomerDashboard() {
-  const { role, accessToken, logout } = useAuth();
+  const { role, logout } = useAuth();
   
   const [file, setFile] = useState<File | null>(null);
   const [docType, setDocType] = useState("Aadhaar");
@@ -36,25 +18,15 @@ export default function CustomerDashboard() {
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file || !accessToken) return;
+    if (!file) return;
 
     setIsUploading(true);
     setUploadMessage("");
 
     try {
-      const payload = parseJwt(accessToken);
-      const userId = payload?.sub;
-
-      if (!userId) {
-        setUploadMessage("Error: Could not identify user ID from token.");
-        setIsUploading(false);
-        return;
-      }
-
       const formData = new FormData();
       formData.append("file", file);
       formData.append("document_type", docType);
-      formData.append("user_id", userId);
 
       const res = await apiClient.post("/customer/document/upload", formData, {
         headers: {
@@ -165,7 +137,7 @@ export default function CustomerDashboard() {
               </p>
             ) : (
               <div className="space-y-6 mt-4">
-                {uploadedDocs.map((doc, idx) => (
+                {uploadedDocs.map((doc) => (
                   <div key={doc.id} className="p-4 rounded-md border border-gray-200 bg-gray-50 relative">
                     <div className="absolute top-2 right-2 bg-canara-gold text-white text-xs px-2 py-1 rounded font-bold">
                       {doc.type}

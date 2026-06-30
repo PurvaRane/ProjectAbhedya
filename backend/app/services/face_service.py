@@ -17,16 +17,7 @@ class FaceService:
     def _get_app(cls):
         if cls._app is None:
             import sys
-            if sys.platform == "darwin":
-                # MacOS ONNX CPUExecutionProvider crashes Uvicorn worker threads
-                import numpy as np
-                class MockFace:
-                    embedding = np.zeros(512)
-                class MockApp:
-                    def get(self, image):
-                        return [MockFace()]
-                cls._app = MockApp()
-                return cls._app
+
 
             from insightface.app import FaceAnalysis
             import os
@@ -60,16 +51,19 @@ class FaceService:
         self,
         image_bytes: bytes,
     ):
-
+        import os
         with tempfile.NamedTemporaryFile(
             delete=False,
             suffix=".jpg",
         ) as temp_file:
-
             temp_file.write(image_bytes)
             temp_path = temp_file.name
 
-        return self.extract_embedding(temp_path)
+        try:
+            return self.extract_embedding(temp_path)
+        finally:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
 
     def compare_embeddings(
         self,
@@ -83,11 +77,8 @@ class FaceService:
         norm_a = np.linalg.norm(a)
         norm_b = np.linalg.norm(b)
         
-        # Guard against zero-norm vectors (e.g. mock face embeddings on macOS)
-        # When InsightFace can't run, both embeddings will be zero vectors.
-        # Auto-pass in this case since real face verification isn't available.
         if norm_a == 0 or norm_b == 0:
-            return 1.0
+            return 0.0
 
         similarity = np.dot(a, b) / (norm_a * norm_b)
 

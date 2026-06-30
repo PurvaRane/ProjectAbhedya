@@ -1,17 +1,10 @@
-print("Testing layoutlm")
-from app.services.layoutlm_service import layoutlm_service
-print("Testing vit")
-from app.services.vit_service import vit_service
-print("Testing forgery")
-from app.services.forgery_service import forgery_service
-print("Testing qr")
-from app.services.qr_service import qr_service
-print("Testing dsc")
-from app.services.dsc_service import dsc_service
-print("Testing ocr")
-from app.services.ocr_service import OCRService
-print("Testing face")
-from app.services.face_service import FaceService
-print("Testing gnn")
-from app.services.gnn_service import GNNService
-print("Done")
+import sys
+print('1')
+from fastapi import FastAPI
+print('2')
+from app.api.customer.document import router as customer_document_router
+print('3')
+from app.api.auth.router import router as auth_router
+print('4')
+from app.api.analyst.fraud import router as analyst_fraud_router
+print('5')

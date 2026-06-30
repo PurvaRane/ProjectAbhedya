@@ -286,14 +286,13 @@ class DocumentPipelineService:
             )
             validation_results["details"]["cropping_heuristic"] = {
                 "passed": not is_cropped,
-                "reason": "Document borders appear cropped/missing." if is_cropped else "Margins are intact."
+                "reason": "Document borders appear cropped/missing (Warning)." if is_cropped else "Margins are intact."
             }
-            if is_cropped:
-                validation_results["passed"] = False
                 
             if validation_results["needs_review"] or not validation_results["passed"]:
-                # Force fraud score up if major validations failed
-                preliminary_fraud_score = max(preliminary_fraud_score, 0.85)
+                # Do not blindly force fraud score up to 85% based on flaky OCR validations.
+                # Let the AI models (LayoutLMv3, ViT, ELA) determine the final risk score.
+                logger.warning(f"Business validations failed for {document.id}, but relying on AI score.")
             
             # Store everything combined in forgery_features
             forgery_features = {
@@ -333,9 +332,27 @@ class DocumentPipelineService:
             logger.info(f"Successfully processed document {document.id}")
             
         except Exception as e:
-            logger.error(f"Error processing document {document.id}: {e}")
+            import traceback
+            logger.error(f"Error processing document {document_id}: {e}\n{traceback.format_exc()}")
             db.rollback()
-            document.status = DocumentUploadStatus.FAILED
-            db.commit()
+            
+            # Re-fetch the document safely in a new transaction to mark it as FAILED
+            try:
+                failed_doc = db.query(Document).filter(Document.id == document_id).first()
+                if failed_doc:
+                    failed_doc.status = DocumentUploadStatus.FAILED
+                    db.commit()
+            except Exception as inner_e:
+                logger.error(f"Failed to update document status to FAILED: {inner_e}")
+                db.rollback()
+                
+        finally:
+            db.close()
 
 document_pipeline = DocumentPipelineService()
+
+from app.worker import celery_app
+
+@celery_app.task(name="process_document_task")
+def process_document_task(document_id: str):
+    document_pipeline.process_document(document_id)

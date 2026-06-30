@@ -95,17 +95,7 @@ class UserRepository:
 
         return user
 
-    def update_face_embedding(
-        self,
-        user: User,
-        face_embedding: str,
-    ) -> User:
-        user.face_embedding = face_embedding
 
-        self.db.commit()
-        self.db.refresh(user)
-
-        return user
 
 
 class EmployeeRepository:
@@ -116,6 +106,13 @@ class EmployeeRepository:
         return (
             self.db.query(EmployeeAccount)
             .filter(EmployeeAccount.email == sanitize_email(email))
+            .first()
+        )
+
+    def get_by_id(self, employee_id: UUID) -> EmployeeAccount | None:
+        return (
+            self.db.query(EmployeeAccount)
+            .filter(EmployeeAccount.id == employee_id)
             .first()
         )
 

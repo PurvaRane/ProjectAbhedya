@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "../../context/AuthContext";
-import { API_URL } from "../../api/client";
+import { API_URL, apiClient } from "../../api/client";
 
 type DocumentAnalysisResult = {
   document_id: string;
@@ -32,7 +31,6 @@ type DocumentAnalysisResult = {
 };
 
 export default function DocumentForensics() {
-  const { accessToken } = useAuth();
   const [documents, setDocuments] = useState<DocumentAnalysisResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -45,14 +43,8 @@ export default function DocumentForensics() {
   const fetchDocuments = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_URL}/api/analyst/fraud/documents`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`
-        }
-      });
-      if (!res.ok) throw new Error("Failed to fetch documents");
-      const data = await res.json();
-      setDocuments(data);
+      const res = await apiClient.get("/analyst/fraud/documents");
+      setDocuments(res.data);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -225,11 +217,7 @@ export default function DocumentForensics() {
                   <button 
                     onClick={async () => {
                       try {
-                        const res = await fetch(`${API_URL}/api/analyst/fraud/verify/${selectedDoc.document_id}`, {
-                          method: 'POST',
-                          headers: { Authorization: `Bearer ${accessToken}` }
-                        });
-                        if (!res.ok) throw new Error("Failed to trigger verification");
+                        await apiClient.post(`/analyst/fraud/verify/${selectedDoc.document_id}`);
                         // Refresh to show PROCESSING
                         fetchDocuments();
                       } catch (err: any) {

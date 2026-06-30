@@ -1,20 +1,49 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { apiClient } from "../../api/client";
 
 export default function ProfileSection() {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
-    name: "John Doe",
-    email: "john.doe@veritrust.in",
-    mobile: "+91 98765 43210",
-    department: "Retail Banking",
-    branch: "Mumbai Main Branch",
-    employeeId: "EMP001245",
-    designation: "Branch Manager",
-    joinDate: "15 March 2021",
+    name: "",
+    email: "",
+    mobile: "Update Required",
+    department: "Risk & Fraud",
+    branch: "Headquarters",
+    employeeId: "",
+    designation: "",
+    joinDate: "N/A",
   });
+
+  useEffect(() => {
+    apiClient.get("/auth/employee/me")
+      .then(res => {
+        const data = res.data;
+        let inferredName = "Employee";
+        if (data.email) {
+          const emailParts = data.email.split('@')[0].split('.');
+          inferredName = emailParts.map((p: string) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+        }
+        
+        setForm(prev => ({
+          ...prev,
+          name: inferredName,
+          email: data.email,
+          employeeId: "EMP-" + data.id.substring(0, 6).toUpperCase(),
+          designation: data.role.replace('_', ' ').toUpperCase()
+        }));
+      })
+      .catch(err => console.error("Failed to load employee profile", err));
+  }, []);
 
   const handleChange = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const getInitials = (name: string) => {
+    if (!name) return "EP";
+    const parts = name.split(" ");
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return name.substring(0, 2).toUpperCase();
   };
 
   return (
@@ -26,7 +55,7 @@ export default function ProfileSection() {
         <div className="dash-card flex flex-col items-center py-8 text-center">
           <div className="relative mb-4">
             <div className="flex h-24 w-24 items-center justify-center rounded-full bg-canara-blue text-white text-3xl font-bold shadow-card">
-              JD
+              {getInitials(form.name)}
             </div>
             <button className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-canara-gold text-canara-blue-dark shadow-sm hover:bg-canara-gold-dark transition">
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

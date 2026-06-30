@@ -1,6 +1,5 @@
 import { useState, useRef } from "react";
-import { useAuth } from "../../context/AuthContext";
-import { API_URL } from "../../api/client";
+import { apiClient } from "../../api/client";
 
 type PipelineStep = {
   id: string;
@@ -10,7 +9,6 @@ type PipelineStep = {
 };
 
 export default function LiveDocumentScanner() {
-  const { accessToken } = useAuth();
   
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -78,10 +76,8 @@ export default function LiveDocumentScanner() {
     while (!resultFound && attempts < 10) {
       await new Promise(r => setTimeout(r, 2000));
       try {
-        const res = await fetch(`${API_URL}/api/analyst/fraud/documents`, {
-          headers: { Authorization: `Bearer ${accessToken}` }
-        });
-        const docs = await res.json();
+        const res = await apiClient.get("/analyst/fraud/documents");
+        const docs = res.data;
         const myDoc = docs.find((d: any) => d.document_id === docId);
         
         if (myDoc && (myDoc.status === "COMPLETED" || myDoc.status === "REJECTED" || myDoc.status === "NEEDS_REVIEW")) {
@@ -114,12 +110,10 @@ export default function LiveDocumentScanner() {
     formData.append("file", file);
     
     try {
-      const res = await fetch(`${API_URL}/api/documents/upload`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${accessToken}` },
-        body: formData
+      const res = await apiClient.post("/customer/document/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
       });
-      const data = await res.json();
+      const data = res.data;
       
       if (data.document_id) {
         simulatePipeline(data.document_id);

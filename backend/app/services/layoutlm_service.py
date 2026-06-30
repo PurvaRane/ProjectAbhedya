@@ -14,15 +14,17 @@ id2label = {
     6: "I-ANSWER"
 }
 
+import threading
+
 class LayoutLMService:
     def __init__(self):
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         self.model_path = os.path.join(base_dir, "models", "hf", "layoutlmv3")
         
         # Load locally if available, else fallback
         if not os.path.exists(self.model_path):
             print(f"Warning: LayoutLMv3 offline model not found at {self.model_path}. Using fallback.")
-            self.model_path = "nielsr/layoutlmv3-finetuned-funsd"
+            self.model_path = "microsoft/layoutlmv3-base"
             
         self.seq_model_path = os.path.join(base_dir, "models", "layoutlmv3_finetuned")
             
@@ -32,19 +34,26 @@ class LayoutLMService:
         
         # Hardware acceleration for fast inference (MPS disabled due to macOS OpenCV threading bugs)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self._lock = threading.Lock()
 
     def _initialize(self):
-        if self.processor is None or self.model is None:
-            self.processor = LayoutLMv3Processor.from_pretrained(self.model_path, apply_ocr=False)
-            self.model = LayoutLMv3ForTokenClassification.from_pretrained(self.model_path).to(self.device)
-            self.model.eval()
-            
-        if self.seq_model is None and os.path.exists(self.seq_model_path):
-            try:
-                self.seq_model = LayoutLMv3ForSequenceClassification.from_pretrained(self.seq_model_path, local_files_only=True).to(self.device)
-                self.seq_model.eval()
-            except Exception as e:
-                print(f"Failed to load fine-tuned LayoutLMv3 seq model: {e}")
+        # Always use the local fine-tuned model path to avoid HuggingFace network calls
+        with self._lock:
+            if self.processor is None or self.model is None:
+                self.processor = LayoutLMv3Processor.from_pretrained(self.seq_model_path, apply_ocr=False, local_files_only=True)
+                # Load TokenClassification model from local finetuned path to ensure offline capability
+                try:
+                    self.model = LayoutLMv3ForTokenClassification.from_pretrained(self.seq_model_path, local_files_only=True).to(self.device)
+                    self.model.eval()
+                except Exception as e:
+                    print(f"Failed to load Token Classification model: {e}")
+                
+            if self.seq_model is None and os.path.exists(self.seq_model_path):
+                try:
+                    self.seq_model = LayoutLMv3ForSequenceClassification.from_pretrained(self.seq_model_path, local_files_only=True).to(self.device)
+                    self.seq_model.eval()
+                except Exception as e:
+                    print(f"Failed to load fine-tuned LayoutLMv3 seq model: {e}")
 
     def extract_layout_fields(self, image: Image.Image, words: list[str], boxes: list[list[int]]):
         """
@@ -157,6 +166,11 @@ class LayoutLMService:
         probs = torch.nn.functional.softmax(outputs.logits, dim=-1)
         # Class 1 is FORGED
         fraud_prob = probs[0][1].item()
-        return float(fraud_prob)
+        
+        # Normalize the raw probability (which heavily biases around 0.66 for baseline images)
+        # to a zero-centered severity score in range [-1.0, 1.0] for the frontend.
+        score = (fraud_prob - 0.70) * 10.0
+        
+        return float(max(min(score, 1.0), -1.0))
 
 layoutlm_service = LayoutLMService()

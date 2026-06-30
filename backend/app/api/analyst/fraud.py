@@ -5,6 +5,7 @@ from app.api.auth.employee import get_current_employee
 from app.db.models import EmployeeAccount, EmployeeRole
 from app.db.session import get_db
 from app.services.gnn_service import GNNService
+from app.schemas.document import DocumentAnalysisResponse
 
 router = APIRouter(prefix="/api/analyst/fraud", tags=["Fraud Analyst"])
 
@@ -16,6 +17,7 @@ def require_fraud_analyst(current_employee: EmployeeAccount = Depends(get_curren
 
 @router.get("/rings/analyze")
 def analyze_fraud_rings(
+    current_employee: EmployeeAccount = Depends(require_fraud_analyst),
     db: Session = Depends(get_db)
 ):
     """
@@ -26,8 +28,9 @@ def analyze_fraud_rings(
     results = gnn_service.analyze_fraud_rings()
     return results
 
-@router.get("/documents")
+@router.get("/documents", response_model=list[DocumentAnalysisResponse])
 def get_analyzed_documents(
+    current_employee: EmployeeAccount = Depends(require_fraud_analyst),
     db: Session = Depends(get_db)
 ):
     """
@@ -71,8 +74,11 @@ def get_analyzed_documents(
                             o_ent = other["ent"]
                             # Check Identity Mismatches
                             for key in ['pan', 'aadhaar', 'gstin']:
-                                if key in my_ent and key in o_ent and my_ent[key] != o_ent[key]:
-                                    conflict_warnings.append(f"Identity Mismatch: {key.upper()} on this document conflicts with another document uploaded by this user.")
+                                if key in my_ent and key in o_ent:
+                                    val_my = my_ent[key].get("value", "") if isinstance(my_ent[key], dict) else my_ent[key]
+                                    val_o = o_ent[key].get("value", "") if isinstance(o_ent[key], dict) else o_ent[key]
+                                    if val_my and val_o and val_my != val_o:
+                                        conflict_warnings.append(f"Identity Mismatch: {key.upper()} on this document conflicts with another document uploaded by this user.")
                             
                             # Check Financials
                             if 'financials' in my_ent and 'financials' in o_ent:
@@ -107,7 +113,7 @@ def get_analyzed_documents(
 @router.post("/verify/{document_id}")
 def verify_document(
     document_id: str,
-    background_tasks: BackgroundTasks,
+    current_employee: EmployeeAccount = Depends(require_fraud_analyst),
     db: Session = Depends(get_db)
 ):
     """
@@ -129,7 +135,8 @@ def verify_document(
     doc.status = DocumentUploadStatus.PROCESSING
     db.commit()
 
-    # Start the massive AI pipeline in the background
-    background_tasks.add_task(document_pipeline.process_document, str(doc.id))
+    # Start the massive AI pipeline in the background using Celery
+    from app.services.document_pipeline import process_document_task
+    process_document_task.delay(str(doc.id))
 
     return {"message": "AI Pipeline Verification started.", "status": "PROCESSING"}

@@ -6,6 +6,7 @@ from fastapi import (
     UploadFile,
     File,
     Form,
+    Response,
 )
 from sqlalchemy.orm import Session
 from fastapi import UploadFile, File
@@ -36,6 +37,47 @@ from app.schemas.auth import (
     UserResponse,
 )
 from app.services.auth_service import AuthService
+from fastapi.security import OAuth2PasswordBearer
+from app.core.security import decode_token
+from fastapi import Request
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/customer/login", auto_error=False)
+
+def get_current_customer(
+    request: Request,
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+):
+    if not token:
+        token = request.cookies.get("access_token")
+        
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+        )
+    payload = decode_token(token)
+    if not payload or payload.get("type") != "customer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    user_id_str = payload.get("sub")
+    if user_id_str is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+        
+    try:
+        user_id = uuid.UUID(user_id_str)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user ID in token")
+        
+    user = UserRepository(db).get_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
+    return user
 
 router = APIRouter(
     prefix="/customer",
@@ -107,7 +149,7 @@ def send_mobile_otp(
         )
 
         return MobileSendOTPResponse(
-            message=f"OTP sent successfully. Demo OTP: {otp_code}",
+            message="OTP sent successfully.",
             mobile_number=data.mobile_number,
             expires_in_seconds=expires_in,
         )
@@ -193,7 +235,6 @@ def send_aadhaar_otp(
             "message": "OTP sent successfully",
             "mobile_number": data.mobile_number,
             "expires_in_seconds": expires_in,
-            "demo_otp": otp_code,
         }
 
     except ValueError as exc:
@@ -362,13 +403,39 @@ async def verify_face(
 )
 def customer_login(
     data: CustomerLoginRequest,
+    response: Response,
     db: Session = Depends(get_db),
 ):
     try:
-        return AuthService(db).login_customer(data)
+        token_data = AuthService(db).login_customer(data)
+        response.set_cookie(
+            key="access_token",
+            value=token_data.access_token,
+            httponly=True,
+            secure=True,
+            samesite="strict",
+            max_age=30 * 60,
+            path="/"
+        )
+        response.set_cookie(
+            key="refresh_token",
+            value=token_data.refresh_token,
+            httponly=True,
+            secure=True,
+            samesite="strict",
+            max_age=7 * 24 * 60 * 60,
+            path="/"
+        )
+        return token_data
 
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(exc),
         ) from exc
+
+@router.post("/logout")
+def customer_logout(response: Response):
+    response.delete_cookie("access_token", path="/")
+    response.delete_cookie("refresh_token", path="/")
+    return {"message": "Logged out successfully"}
