@@ -34,34 +34,33 @@ class ForgeryService:
             
             # Calculate the absolute difference between original and resaved
             diff = ImageChops.difference(original, resaved)
-            
-            # Get the extreme values in the difference image
-            extrema = diff.getextrema()
-            max_diff = max([ex[1] for ex in extrema])
-            
-            if max_diff == 0:
-                max_diff = 1
-                
-            # Enhance the difference image
-            scale = 255.0 / max_diff
-            ela_image = ImageEnhance.Brightness(diff).enhance(scale)
-            
-            # Calculate a simple ELA score (variance of the difference)
-            # High variance often indicates splicing/tampering
             diff_array = np.array(diff)
-            ela_score = float(np.var(diff_array) / 255.0)
+            
+            # Instead of perceptual grayscale weighting (which OpenCV's applyColorMap does to 3-channel images),
+            # which can obscure anomalies isolated in a single color channel (e.g. Red channel),
+            # we take the maximum difference across the RGB channels for each pixel.
+            diff_max = np.max(diff_array, axis=2)
+            
+            max_diff = float(np.max(diff_max))
+            if max_diff == 0:
+                max_diff = 1.0
+                
+            # Scale the 2D difference array to the full 0-255 range so anomalies are clearly visible
+            scale = 255.0 / max_diff
+            ela_scaled = np.clip(diff_max * scale, 0, 255).astype(np.uint8)
+            
+            # Calculate ELA score (normalized variance of the max difference)
+            # High variance often indicates splicing/tampering
+            ela_score = float(np.var(diff_max) / 255.0)
             
             # Save the ELA heatmap
             import os
             from pathlib import Path
             p = Path(image_path)
             heatmap_path = os.path.join(p.parent, f"ela_{p.stem}.jpg")
-            # Enhance the difference image
-            scale = 255.0 / max_diff
-            ela_image = ImageEnhance.Brightness(diff).enhance(scale)
-            # Apply a pseudo-color colormap using OpenCV for better visualization
-            ela_cv = cv2.cvtColor(np.array(ela_image), cv2.COLOR_RGB2BGR)
-            heatmap = cv2.applyColorMap(ela_cv, cv2.COLORMAP_JET)
+            
+            # Apply JET colormap directly to the 2D grayscale array (0 -> Blue, 255 -> Red)
+            heatmap = cv2.applyColorMap(ela_scaled, cv2.COLORMAP_JET)
             cv2.imwrite(heatmap_path, heatmap)
             
             return {
