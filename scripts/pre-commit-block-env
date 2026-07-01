@@ -1,0 +1,16 @@
+#!/bin/sh
+# Blocks commits that include .env files or other secret artifacts.
+# Install: cp scripts/pre-commit-block-env .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+blocked=$(git diff --cached --name-only | grep -E '(^|/)\.env$|\.env\.local$|secrets\.json$|credentials\.json$' | grep -v '\.env\.example$' || true)
+
+if [ -n "$blocked" ]; then
+  echo "ERROR: Refusing to commit secret environment files:"
+  echo "$blocked" | sed 's/^/  - /'
+  echo ""
+  echo "Use backend/.env.example and frontend/.env.example as templates only."
+  echo "Keep real credentials in backend/.env (gitignored), never in the repo."
+  exit 1
+fi
+
+exit 0

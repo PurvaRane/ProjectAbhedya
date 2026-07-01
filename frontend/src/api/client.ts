@@ -65,3 +65,47 @@ export interface MobileOTPResponse {
   mobile_number: string;
   expires_in_seconds: number;
 }
+
+type ApiErrorBody = {
+  detail?: string | { msg: string; type?: string }[];
+  message?: string;
+  code?: string | null;
+};
+
+function extractDetailMessage(data: ApiErrorBody | undefined): string | null {
+  if (!data) return null;
+  const { detail, message } = data;
+  if (typeof message === "string" && message.trim()) return message;
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (Array.isArray(detail) && detail.length > 0) {
+    const first = detail[0];
+    if (typeof first === "object" && first?.msg) return first.msg;
+  }
+  return null;
+}
+
+/** Returns a user-facing message including HTTP status when the API responds. */
+export function getErrorMessage(error: unknown): string {
+  if (typeof error === "object" && error !== null && "response" in error) {
+    const axiosError = error as {
+      response?: { status?: number; data?: ApiErrorBody };
+      code?: string;
+      message?: string;
+    };
+    const status = axiosError.response?.status;
+    const apiMessage = extractDetailMessage(axiosError.response?.data);
+
+    if (status && apiMessage) return `Error ${status}: ${apiMessage}`;
+    if (apiMessage) return apiMessage;
+    if (status) return `Request failed with status ${status}. Please try again.`;
+  }
+
+  if (typeof error === "object" && error !== null && "code" in error) {
+    const networkError = error as { code?: string; message?: string };
+    if (networkError.code === "ERR_NETWORK") {
+      return "Cannot reach the server. Ensure the backend is running on port 8000.";
+    }
+  }
+
+  return "An unexpected error occurred. Please try again.";
+}

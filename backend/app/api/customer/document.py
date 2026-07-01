@@ -6,7 +6,6 @@ from pathlib import Path
 
 from app.db.session import get_db
 from app.db.models import Document, DocumentUploadStatus, User
-from app.services.document_pipeline import document_pipeline
 from app.api.auth.customer import get_current_customer
 from app.schemas.document import DocumentUploadResponse, DocumentStatusResponse
 

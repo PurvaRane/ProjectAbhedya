@@ -3,12 +3,19 @@ frontend/node_modules/
 backend/venv/
 backend/.venv/
 
-# Environment & secrets (never commit)
+# Environment & secrets (NEVER commit — copy from .env.example only)
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+!**/.env.example
 backend/.env
+backend/.env.local
 frontend/.env
+frontend/.env.local
+**/secrets.json
+**/credentials.json
+*.pem
+*.key
 
 # Python
 __pycache__/

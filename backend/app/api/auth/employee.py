@@ -12,6 +12,7 @@ from app.schemas.auth import (
 )
 from app.services.auth_service import AuthService
 from app.services.captcha_service import CaptchaService
+from app.core.exceptions import employee_login_error_response
 from fastapi.security import OAuth2PasswordBearer
 from app.core.security import decode_token
 from fastapi import Request
@@ -92,14 +93,11 @@ def employee_login(
     db: Session = Depends(get_db),
 ):
     try:
-        return AuthService(db).initiate_employee_login(
-            data
-        )
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(exc),
-        ) from exc
+        return AuthService(db).initiate_employee_login(data)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise employee_login_error_response(exc) from exc
 
 
 @router.post(

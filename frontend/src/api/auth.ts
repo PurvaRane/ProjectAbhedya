@@ -1,4 +1,6 @@
-import { apiClient, MessageResponse, MobileOTPResponse, TokenResponse, UserResponse } from "./client";
+import { apiClient, MessageResponse, MobileOTPResponse, TokenResponse, UserResponse, getErrorMessage } from "./client";
+
+export { getErrorMessage };
 
 export const authApi = {
   registerEmail: (data: {
@@ -123,13 +125,3 @@ export const authApi = {
   employeeVerifyFace: (data: { email: string; image_base64: string; device_id: string }) =>
     apiClient.post<TokenResponse>("/auth/employee/verify-face", data),
 };
-
-export function getErrorMessage(error: unknown): string {
-  if (typeof error === "object" && error !== null && "response" in error) {
-    const axiosError = error as { response?: { data?: { detail?: string | { msg: string }[] } } };
-    const detail = axiosError.response?.data?.detail;
-    if (typeof detail === "string") return detail;
-    if (Array.isArray(detail) && detail[0]?.msg) return detail[0].msg;
-  }
-  return "An unexpected error occurred. Please try again.";
-}

@@ -5,12 +5,9 @@ from PIL import Image
 from sqlalchemy.orm import Session
 
 from app.db.models import Document, DocumentAnalysis, DocumentUploadStatus
-from app.services.layoutlm_service import layoutlm_service
-from app.services.vit_service import vit_service
 from app.services.ocr_service import OCRService
 
 from app.services.forgery_service import forgery_service
-from app.services.risk_service import risk_service
 from app.services.iqa_service import iqa_service
 from app.services.qr_service import qr_service
 from app.services.dsc_service import dsc_service
@@ -193,6 +190,9 @@ class DocumentPipelineService:
                 
             width, height = image.size
 
+            from app.services.vit_service import vit_service
+            from app.services.layoutlm_service import layoutlm_service
+
             # Define tasks to run concurrently
             with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
                 # Stage 1: Independent tasks
@@ -261,6 +261,8 @@ class DocumentPipelineService:
             
             # 5. Explainable AI Risk Scoring (SHAP) - Now enhanced with Deep Learning Models!
             layout_entities_count = len(layout_entities)
+            from app.services.risk_service import risk_service
+
             risk_data = risk_service.calculate_risk(
                 ela_score=ela_score, 
                 layout_entities_count=layout_entities_count, 

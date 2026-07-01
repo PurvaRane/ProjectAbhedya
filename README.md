@@ -29,9 +29,11 @@
   - [Business Logic Layer](#business-logic-layer)
 - [🏗️ System Architecture](#️-system-architecture)
 - [🔐 Authentication \& Security Flows](#-authentication--security-flows)
+  - [Employee Login State Machine](#employee-login-state-machine)
   - [Customer Registration Flow](#customer-registration-flow)
 - [🗄️ Database Schema \& API](#️-database-schema--api)
   - [Core API Endpoints](#core-api-endpoints)
+- [⚡ Quick Start in 5 Minutes (No ML Build)](#-quick-start-in-5-minutes-no-ml-build)
 - [🚀 Getting Started (Installation)](#-getting-started-installation)
   - [1. Clone the Repository](#1-clone-the-repository)
   - [2. Configure Environment Variables](#2-configure-environment-variables)
@@ -40,9 +42,11 @@
   - [5. Access the Platform](#5-access-the-platform)
 - [⚙️ Environment Configuration](#️-environment-configuration)
   - [Backend (`backend/.env`)](#backend-backendenv)
+- [📊 Capability Matrix](#-capability-matrix)
 - [🧪 Complete Testing Workflow](#-complete-testing-workflow)
   - [Step-by-Step Judging Guide:](#step-by-step-judging-guide)
 - [🛠️ Troubleshooting](#️-troubleshooting)
+  - [Windows-Specific Issues](#windows-specific-issues)
 - [🧑‍💻 Local Development (Without Full Docker)](#-local-development-without-full-docker)
 
 ---
@@ -151,6 +155,35 @@ VeriTrust incorporates strict, enterprise-grade banking security:
 - **Middleware**: Injects HSTS, CSP, X-Frame-Options, and X-XSS-Protection headers.
 - **File Security**: Strict 10MB limits, Path Traversal protection, and authenticated route guards for document viewing.
 
+### Employee Login State Machine
+
+Bank staff login uses a multi-step MFA flow: offline CAPTCHA → credentials → Behavioral Confidence Score (BCS) → optional email OTP → face verification → JWT.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Captcha: GET /api/auth/employee/captcha
+    Captcha --> LoginInit: POST /api/auth/employee/login\n(captcha + email + password + device_id)
+    LoginInit --> Failed: CAPTCHA or credentials invalid
+    Failed --> [*]
+    LoginInit --> BCS: Credentials verified
+    BCS --> RequireOTP: BCS below 80\n(untrusted device or fast typing)
+    BCS --> RequireFace: BCS >= 80\nand trusted device
+    RequireOTP --> RequireFace: POST /api/auth/employee/verify-otp
+    RequireOTP --> Failed: Invalid or expired OTP
+    RequireFace --> JWT: POST /api/auth/employee/verify-face\n(demo: 5s delay + bypass)
+    RequireFace --> Failed: Face processing error
+    JWT --> [*]: access_token + refresh_token issued
+```
+
+| Step | API | What happens |
+| ---- | --- | ------------ |
+| 1 | `GET /api/auth/employee/captcha` | Stateless math CAPTCHA (offline, no external API). |
+| 2 | `POST /api/auth/employee/login` | Verifies CAPTCHA + password; computes BCS from typing speed and device trust. |
+| 3a | `POST /api/auth/employee/verify-otp` | *(If required)* Email OTP check via Redis; OTP prints to logs if SMTP is blank. |
+| 3b | Skip OTP | Trusted device + human-like typing skips straight to face step. |
+| 4 | `POST /api/auth/employee/verify-face` | Face match (demo uses hardcoded bypass); marks device as trusted. |
+| 5 | JWT cookies | `access_token` (30m) + `refresh_token` (7d) set for dashboard access. |
+
 ### Customer Registration Flow
 1. Enter Mobile → OTP sent via Twilio SMS.
 2. Verify OTP → Enter Full Name, PAN, Email, Password.
@@ -179,6 +212,85 @@ VeriTrust incorporates strict, enterprise-grade banking security:
 
 ---
 
+## ⚡ Quick Start in 5 Minutes (No ML Build)
+
+Use this path to demo **auth, registration, and the analyst dashboard** without waiting for the full Docker ML image build (OCR model download + PyTorch can take 30+ minutes and often fails on first build).
+
+**You get:** customer/employee login, OTP flows, dashboard UI, document upload listing.  
+**You skip:** Celery worker, GPU, HuggingFace model download, full `docker-compose up --build`.
+
+### Steps (Windows PowerShell)
+
+```powershell
+git clone https://github.com/PurvaRane/ProjectAbhedya.git
+cd ProjectAbhedya
+
+copy backend\.env.example backend\.env
+copy frontend\.env.example frontend\.env
+```
+
+Edit `backend/.env` — minimum for local Docker:
+
+```env
+DATABASE_URL=postgresql://veritrust:veritrust_secret@localhost:5433/veritrust_db
+REDIS_URL=redis://localhost:6379/0
+JWT_SECRET_KEY=change-me-to-a-long-random-string
+# Leave SMTP/Twilio blank — OTPs print in backend logs
+```
+
+Start **only** Postgres, Redis, API, and frontend (no Celery, no `--build`):
+
+```powershell
+docker-compose up postgres redis backend frontend -d
+```
+
+Migrate and seed test accounts:
+
+```powershell
+docker exec veritrust_backend alembic upgrade head
+docker exec veritrust_backend python scripts/seed_employees.py
+```
+
+Open [http://localhost:5173](http://localhost:5173) and log in as **Fraud Analyst**: `analyst@veritrust.in` / `Analyst@12345`.
+
+When registering a customer, watch the backend container logs for OTP codes:
+
+```powershell
+docker logs -f veritrust_backend
+```
+
+### When you need document AI later
+
+Start Celery inside the existing backend container (avoids rebuilding the `celery_worker` image):
+
+```powershell
+docker exec -d veritrust_backend python -m celery -A app.worker.celery_app worker --loglevel=info
+```
+
+Then use **Verify Document (Run AI)** on the analyst dashboard. First run may be slow on CPU.
+
+### Auth-only local backend (no Docker API)
+
+If you prefer `uvicorn` on Windows without installing PyTorch:
+
+```powershell
+docker-compose up postgres redis -d
+cd backend
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+# If torch install fails, auth still works — ML routes lazy-load on first use
+$env:DATABASE_URL="postgresql://veritrust:veritrust_secret@localhost:5433/veritrust_db"
+$env:REDIS_URL="redis://localhost:6379/0"
+alembic upgrade head
+python scripts/seed_employees.py
+uvicorn app.main:app --reload --port 8000
+```
+
+Stop the Docker `backend` service first if port `8000` is already taken.
+
+---
+
 ## 🚀 Getting Started (Installation)
 
 **Prerequisites:** 
@@ -194,6 +306,9 @@ cd ProjectAbhedya
 ```
 
 ### 2. Configure Environment Variables
+
+**Important:** Only `*.env.example` files belong in git. Never commit `backend/.env` or `frontend/.env`.
+
 ```bash
 # Backend
 cp backend/.env.example backend/.env
@@ -201,7 +316,23 @@ cp backend/.env.example backend/.env
 # Frontend
 cp frontend/.env.example frontend/.env
 ```
-*(See the Environment Configuration section below if you wish to configure live Twilio/SMTP. Otherwise, OTPs will print to the backend terminal for easy testing).*
+
+On Windows (PowerShell):
+
+```powershell
+copy backend\.env.example backend\.env
+copy frontend\.env.example frontend\.env
+```
+
+Then edit `backend/.env` locally with your SMTP/Twilio keys if needed.
+
+**Optional — block accidental .env commits:**
+
+```powershell
+.\scripts\install-git-hooks.ps1
+```
+
+*(Leave SMTP/Twilio blank in `.env` for offline mode — OTPs print to the backend terminal.)*
 
 ### 3. Start All Services via Docker
 ```bash
@@ -239,6 +370,42 @@ docker exec veritrust_backend python scripts/seed_employees.py
 
 *If Twilio/SMTP are left blank, VeriTrust falls back to `[OFFLINE SIMULATION]` mode and prints OTPs directly to the terminal logs.*
 
+### Secrets safety
+
+| File | Commit to git? | Purpose |
+| ---- | -------------- | ------- |
+| `backend/.env.example` | Yes | Template with empty placeholders |
+| `frontend/.env.example` | Yes | Template with safe defaults |
+| `backend/.env` | **Never** | Your real DB URL, JWT secret, SMTP, Twilio |
+| `frontend/.env` | **Never** | Local API URL overrides |
+
+If credentials were ever pushed to GitHub, **rotate them immediately** (Gmail App Password, Twilio Auth Token, JWT secret).
+
+---
+
+## 📊 Capability Matrix
+
+What works in each setup — use this to choose between the [5-minute quick start](#-quick-start-in-5-minutes-no-ml-build) and the full ML stack.
+
+| Feature | Redis required? | Celery required? | GPU required? | Twilio / SMTP required? | 5-min setup | Full Docker build |
+| ------- | --------------- | ---------------- | ------------- | ----------------------- | ----------- | ----------------- |
+| Customer email/mobile registration | Yes (OTP state) | No | No | No — OTPs in logs | Yes | Yes |
+| Customer login (JWT) | No | No | No | No | Yes | Yes |
+| Employee MFA login (CAPTCHA → OTP → Face) | Yes | No | No — face is demo bypass | No — email OTP in logs | Yes | Yes |
+| Employee audit logs | No | No | No | No | Yes | Yes |
+| Document upload & metadata | No | No | No | No | Yes (stays `PENDING`) | Yes |
+| 10-stage document AI pipeline | Yes (broker) | **Yes** | No — CPU works, GPU faster | No | No — start worker manually | Yes |
+| ELA heatmaps, ViT, LayoutLM, SHAP | Yes | **Yes** | No — CPU works, GPU faster | No | No | Yes |
+| Fraud ring GNN analysis | No | No | No — CPU inference | No | Limited without `torch` locally | Yes |
+| Live SMS / email delivery | Yes | No | No | **Yes** (Twilio + SMTP) | Optional | Optional |
+
+**Notes**
+
+- **Without Redis:** OTP cooldowns and employee login fail — always run `redis` (Docker or local).
+- **Without Celery:** uploads succeed but documents never move past `PENDING` / `PROCESSING`.
+- **Without GPU:** all ML stages run on CPU; expect multi-minute first inference.
+- **Without Twilio/SMTP:** set those env vars to empty strings; codes appear in `docker logs veritrust_backend` or `backend/offline_otps.log`.
+
 ---
 
 ## 🧪 Complete Testing Workflow
@@ -270,10 +437,26 @@ We have pre-seeded employee accounts to evaluate the Analyst Dashboard immediate
 | `dockerDesktopLinuxEngine pipe error`     | Docker daemon is not running. Start Docker Desktop first.                                                                                                                       |
 | Frontend changes not reflecting           | Vite polling is active. Press `Ctrl+F5` for a hard refresh.                                                                                                                     |
 | Database Migration Errors                 | Ensure `docker-compose up` is fully running before executing `alembic upgrade head`.                                                                                            |
-| Port 5432 / 5173 / 8000 already in use    | Run `docker-compose down`, kill conflicting processes, and retry.                                                                                                               |
+| Port 5433 / 5173 / 8000 already in use    | Postgres is mapped to **5433** (not 5432). Run `docker-compose down`, kill conflicting processes, and retry.                                                                    |
 | Email OTP fails with `535 BadCredentials` | You used your standard Gmail password. You must generate a Google **App Password**.                                                                                             |
-| SMS OTP fails                             | Ensure the recipient number is verified on your Twilio Trial account, and Geo-permissions for India are enabled.                                                                |
+| SMS OTP fails                             | Ensure the recipient number is verified on your Twilio Trial account, and Geo-permissions for India are enabled. Leave Twilio blank to use offline OTP logs instead.            |
 | AI Models not loading                     | Ensure the machine has sufficient RAM. If running natively without Docker, ensure `/backend/models/` contains the necessary HuggingFace weights or fallback logic is triggered. |
+| `docker-compose up --build` fails on OCR  | Paddle2ONNX / model download step failed. Use the [5-minute quick start](#-quick-start-in-5-minutes-no-ml-build) without `--build`, or start Celery manually in the backend container. |
+| Documents stuck on `PENDING`              | Celery worker is not running. Start with `docker exec -d veritrust_backend python -m celery -A app.worker.celery_app worker --loglevel=info`.                                 |
+| Employee login `500` / unexpected error   | Often Redis down or bcrypt mismatch — see [Windows-specific issues](#windows-specific-issues) below.                                                                            |
+
+### Windows-Specific Issues
+
+| Problem | Cause & Solution |
+| ------- | ---------------- |
+| **`fatal: Unable to create '.git/index.lock'`** (OneDrive) | OneDrive sync locks `.git` while Cursor/Git writes. Close Cursor, delete `ProjectAbhedya\.git\index.lock`, pause OneDrive sync for the project folder, or move the repo outside OneDrive (e.g. `C:\dev\ProjectAbhedya`). |
+| **Employee login `500` — bcrypt / passlib** | `bcrypt` 4.x breaks `passlib` 1.7.4. Pin versions from `requirements.txt`: `bcrypt==3.2.2`, `passlib[bcrypt]==1.7.4`. In venv: `pip install --force-reinstall bcrypt==3.2.2 "passlib[bcrypt]==1.7.4"`. Restart `uvicorn`. |
+| **Celery: `executable file not found in $PATH`** | Older backend image has no Celery on PATH. Run: `docker exec -d veritrust_backend python -m celery -A app.worker.celery_app worker --loglevel=info` (note `python -m celery`, not bare `celery`). |
+| **`ModuleNotFoundError: No module named 'torch'`** (local) | Expected on Windows without CUDA. Auth and dashboard work via lazy ML imports. Install full `requirements.txt` only when you need GNN/document AI locally. |
+| **PowerShell `&&` not valid** | Use `;` or run commands on separate lines. Example: `cd backend; .\venv\Scripts\Activate.ps1` |
+| **Wrong Postgres port locally** | Docker maps Postgres to **5433**. Set `DATABASE_URL=...@localhost:5433/veritrust_db` in `backend/.env`, not `5432`. |
+| **Redis connection refused (local uvicorn)** | Start Redis: `docker-compose up redis -d`. Use `REDIS_URL=redis://localhost:6379/0` (not `redis://redis:6379` — that hostname only works inside Docker). |
+| **venv activation blocked** | Run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once, then `.\venv\Scripts\Activate.ps1`. |
 
 ---
 
@@ -289,17 +472,17 @@ If you prefer to run services natively for faster Hot Module Replacement (HMR):
    ```bash
    cd backend
    python -m venv venv
-   source venv/bin/activate
+   source venv/bin/activate          # Windows: .\venv\Scripts\Activate.ps1
    pip install -r requirements.txt
    alembic upgrade head
    python scripts/seed_employees.py
    uvicorn app.main:app --reload --port 8000
    ```
-3. **Start Celery Worker**:
+3. **Start Celery Worker** (optional — only for document AI):
    ```bash
    cd backend
-   source venv/bin/activate
-   celery -A app.worker.celery_app worker --loglevel=info
+   source venv/bin/activate          # Windows: .\venv\Scripts\Activate.ps1
+   python -m celery -A app.worker.celery_app worker --loglevel=info
    ```
 4. **Start Frontend**:
    ```bash
@@ -307,6 +490,8 @@ If you prefer to run services natively for faster Hot Module Replacement (HMR):
    npm install
    npm run dev
    ```
+
+See the [Capability Matrix](#-capability-matrix) for what works without Celery, GPU, or Twilio.
 
 ---
 

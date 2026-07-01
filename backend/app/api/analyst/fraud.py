@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 from app.api.auth.employee import get_current_employee
 from app.db.models import EmployeeAccount, EmployeeRole
 from app.db.session import get_db
-from app.services.gnn_service import GNNService
 from app.schemas.document import DocumentAnalysisResponse
 
 router = APIRouter(prefix="/api/analyst/fraud", tags=["Fraud Analyst"])
@@ -24,6 +23,8 @@ def analyze_fraud_rings(
     Triggers the Heterogeneous Graph Neural Network (GNN) to analyze the database
     and return clustered fraud rings (users with high interconnected risk scores).
     """
+    from app.services.gnn_service import GNNService
+
     gnn_service = GNNService(db)
     results = gnn_service.analyze_fraud_rings()
     return results

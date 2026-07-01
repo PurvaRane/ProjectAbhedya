@@ -2,9 +2,8 @@ import logging
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import os
-from sqlalchemy import text
-import redis
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -13,8 +12,12 @@ from app.api.customer.document import router as customer_document_router
 from app.api.auth.router import router as auth_router
 from app.api.analyst.fraud import router as analyst_fraud_router
 from app.core.config import get_settings
+from app.core.logging_setup import configure_logging
+from app.core.health import build_health_report
+from app.core.exceptions import register_exception_handlers
 
-logging.basicConfig(level=logging.INFO)
+configure_logging()
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 app = FastAPI(
@@ -29,6 +32,7 @@ app = FastAPI(
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+register_exception_handlers(app)
 
 app.add_middleware(
     CORSMiddleware,
@@ -115,23 +119,6 @@ def serve_upload(file_path: str, request: Request):
 @app.get("/api/health")
 @limiter.limit("60/minute")
 def health_check(request: Request):
-    from app.db.session import engine
-    health = {"status": "healthy", "service": settings.app_name, "db": "unknown", "redis": "unknown"}
-    
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        health["db"] = "connected"
-    except Exception as e:
-        health["db"] = "disconnected"
-        health["status"] = "unhealthy"
-        
-    try:
-        r = redis.from_url(settings.redis_url)
-        r.ping()
-        health["redis"] = "connected"
-    except Exception as e:
-        health["redis"] = "disconnected"
-        health["status"] = "unhealthy"
-        
-    return health
+    health = build_health_report()
+    status_code = 200 if health["status"] in ("healthy", "degraded") else 503
+    return JSONResponse(status_code=status_code, content=health)
